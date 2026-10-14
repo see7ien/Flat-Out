@@ -1,6 +1,8 @@
 # Notes: Japan pipeline (final cleaning, 15 Oct 2026)
 
-All result numbers live in `analysis.ipynb`. Captions are computed from outputs with `caption()`, so they cannot go stale. The values quoted below are from the final Japan run.
+All result numbers live in the notebooks (`01_japan_validation.ipynb`, `02_season.ipynb`, `03_regulations.ipynb`). Captions are computed from outputs with `caption()`, so they cannot go stale; the values quoted below are snapshots.
+
+**Headline (2025 vs 2026, matched straights):** On ~85 % of matched straights 2026 cars peak earlier and lose more speed at full throttle; on none is it the reverse; the rest show no clipping in either year. Descriptive; the difference reflects the whole 2026 package, not one rule. It holds when straights whose end point moved between years or sessions with rain are excluded (Section "Robustness checks" in `03_regulations.ipynb`).
 
 ## Final freeze rule (locked)
 Documented sentinels only, with no thresholds tuned to Japan, so the rule carries over unchanged to the season.
