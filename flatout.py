@@ -302,8 +302,14 @@ def segment_metrics(seg, jumps):
                 JumpFlag=bool(jumps.iloc[max(int(np.argmax(sp)) - 1, 0):].any()))
 
 
+SEGMENT_COLUMNS = ["Driver", "Team", "PU", "LapNumber", "QualiPart", "LapTime", "Label", "Via", "StartPos_m", "EndPos_m",
+                   "Truncated", "Frozen", "start_m", "end_m", "peak_m", "length_m", "peak_speed", "end_speed", "clip_delta",
+                   "clip_distance", "decel_rate", "vmax_position", "taper_kw_at_peak", "pke", "JumpFlag"]
+
+
 def sector_segment_rows(push, corners):
-    """One row per push lap and sector (PKE, Frozen) and per full-throttle segment (label, metrics, Frozen, Truncated)."""
+    """One row per push lap and sector (PKE, Frozen) and per full-throttle segment (label, metrics, Frozen, Truncated).
+    With corners None (no FastF1 circuit info), corner-labelled segments are skipped: an empty segments table is returned."""
     sec_rows, seg_rows = [], []
     for _, lap in push.iterlaps():
         car = lap.get_car_data().add_distance()
@@ -314,6 +320,8 @@ def sector_segment_rows(push, corners):
             frozen = pd.isna(ta) or pd.isna(tb) or frozen_between(lap, car, ta.total_seconds(), tb.total_seconds())
             sec_rows.append(dict(meta(lap), Sector=name, Frozen=frozen,
                                  PKE=np.nan if frozen else pke(car[(st >= ta) & (st <= tb)])))
+        if corners is None:
+            continue
 
         xyd, pt, cpos = lap_geometry(lap, corners)
         jumps = implausible_jumps(car)
@@ -324,7 +332,9 @@ def sector_segment_rows(push, corners):
                                  Via=",".join(f"T{n}" for n, x in cpos.items() if p0 < x < p1),
                                  StartPos_m=p0, EndPos_m=p1, Truncated=i0 == 0 or i1 == len(car),
                                  Frozen=bool(flag.iloc[i0:i1].any()), **segment_metrics(car.iloc[i0:i1], jumps.iloc[i0:i1])))
-    return pd.DataFrame(sec_rows), pd.DataFrame(seg_rows)
+    seg = pd.DataFrame(seg_rows) if seg_rows else pd.DataFrame(columns=SEGMENT_COLUMNS).astype(
+        {"Truncated": bool, "Frozen": bool, "JumpFlag": bool, "LapTime": "timedelta64[ns]"})
+    return pd.DataFrame(sec_rows), seg
 
 
 def line_window(session, lap, window_s=30):
@@ -374,7 +384,12 @@ def select_clean(sec_all, seg_all, ms_all, exclude_jumps=False):
     sectors = best_clean_lap(sec_all[~sec_all.Frozen], by=["Driver", "Sector"])
     straights = best_clean_lap(seg_all[ok_seg], by=["Driver", "Label"])
     main = best_clean_lap(ms_all[ok_main]).assign(Label="T1", Via="timing line", CrossesTimingLine=True)
-    return sectors, straights, main, pd.concat([straights.assign(CrossesTimingLine=False), main], ignore_index=True)
+    return sectors, straights, main, concat_nonempty([straights.assign(CrossesTimingLine=False), main], ignore_index=True)
+
+
+def concat_nonempty(frames, **kw):
+    """pd.concat without empty frames (pandas deprecates letting them set dtypes); all frames if every one is empty."""
+    return pd.concat([f for f in frames if len(f)] or frames, **kw)
 
 
 
@@ -406,7 +421,10 @@ def run_session(year, event, official_length_m=None, openf1_session=None):
     ses = load_quali(year, event)
     if openf1_session is not None:
         load_openf1_brake(openf1_session, ses.drivers)
-    crn = ses.get_circuit_info().corners.set_index("Number")
+    try:
+        crn = ses.get_circuit_info().corners.set_index("Number")
+    except Exception:  # FastF1 has no circuit info for some venues and then fails (FastF1 issue #692)
+        crn = None
     fl = {d: lap for d in ses.results["Abbreviation"] if (lap := ses.laps.pick_drivers(d).pick_fastest()) is not None}
     v1_ = lap_distance_check(fl, official_length_m) if official_length_m else None
     push_, lap_log_ = push_laps(ses)
@@ -416,7 +434,7 @@ def run_session(year, event, official_length_m=None, openf1_session=None):
     frozen = pd.DataFrame([dict(PU=PU[lap["Team"]], FrozenPct=100 * freeze_mask(lap.get_car_data())[0].mean())
                            for _, lap in push_.iterlaps()])
     cols = ["Scope", "Driver", "LapNumber", "QualiPart", "Item", "Reason"]
-    excl = pd.concat([
+    excl = concat_nonempty([
         lap_log_.assign(Scope="lap", Item=""),
         sec_all_[sec_all_.Frozen].assign(Scope="sector", Item=lambda x: x.Sector, Reason="overlaps freeze or missing sector time"),
         seg_all_.assign(Scope="straight", Item=seg_all_.Label, Reason=segment_reason(seg_all_)).query("Reason != ''"),
@@ -424,6 +442,7 @@ def run_session(year, event, official_length_m=None, openf1_session=None):
     ])[cols]
     err = (lambda c, f: getattr(v1_[c].abs(), f)()) if v1_ is not None else (lambda c, f: np.nan)
     qc = {"brake_source": "OpenF1" if openf1_session is not None else "no OpenF1: brake taken at face value",
+          "circuit_info": "ok" if crn is not None else "no corner positions in FastF1: labelled straights skipped",
           "drivers": len(fl), "timed_laps": int(ses.laps["LapTime"].notna().sum()), "push_laps": len(push_),
           "lap_exclusions": len(lap_log_),
           "v1_car_mean_abs_err_pct": err("CarData_err%", "mean"), "v1_car_max_abs_err_pct": err("CarData_err%", "max"),

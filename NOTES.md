@@ -39,6 +39,18 @@ Documented sentinels only, with no thresholds tuned to Japan, so the rule carrie
 - **Not cited:** the FastF1 "Known bugs" page returns 404.
 - **Warning filter:** one numpy timedelta `DeprecationWarning`, raised inside pandas/FastF1, is silenced by its exact message.
 
+## Season run (first pass, 14 Oct 2026)
+- **Calendar:** the 2026 Bahrain and Saudi Arabian GPs were cancelled (OpenF1 `is_cancelled` for Sakhir and Jeddah). The Bahrain GP was rescheduled to Sepang (OpenF1 session 11730, location "Kuala Lumpur"), and FastF1 correctly lists it as "Bahrain Grand Prix".
+- **Missing circuit info:** FastF1 has no circuit info (corner positions, from the MultiViewer API) for Madrid and Sepang, and `Session.get_circuit_info()` then fails with an `AttributeError` (known: FastF1 issue #692).
+  - `run_session` now skips corner-labelled straights for such sessions and logs `circuit_info = "no corner positions in FastF1: labelled straights skipped"`. Sectors/PKE, main-straight rows, freeze share, the distance check and exclusions are still produced. Japan is unchanged.
+  - Madrid has no main-straight rows: its full-throttle stretch over the line is 420–475 m, below the 500 m minimum.
+- **Reporting rule:** a straight is reported for a session only with >= 10 clean drivers (`MIN_CLEAN_DRIVERS` in `02_season.ipynb`).
+
+## Next steps
+- **Data-driven straight labelling** as a fallback for venues without FastF1 circuit info: cluster segment end positions (X/Y lap position) across drivers and label each cluster by its median end position, instead of the next corner.
+- **Lap-level data checks (proposed, not implemented):** reject a push lap with dead or missing channels, which carry no 104 marker: X/Y position stationary or (0, 0) on any sample, or Speed zero for the whole lap. Keep the 3 % car-vs-X/Y distance check as reporting only. It flags 43 of 1,518 push laps, but 35 selected rows come from these laps, and most of their error comes from a freeze elsewhere on the lap rather than in the selected segment.
+- **"Lap end" segments (proposed):** treat a segment with no corner ahead within the lap as truncated by the lap boundary. At Monza these are the Parabolica-to-line stretch on laps where the driver lifted at the line; the main straight is measured across the line separately.
+
 ## Open issues
 1. **Validation 2:** the primary window is about 11.6 km/h (mean drop difference) from F1Technical; the segment-end window is about 2.5 km/h. F1Technical's source, driver and lap per team, and minimum-speed location are unknown. On raw fastest laps, both windows are far off (15–25 km/h), because 8 of 12 raw laps contain freezes in T14–T16.
 2. **The 15 isolated `Throttle == 104` samples** are flagged but not inspected.
