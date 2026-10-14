@@ -53,6 +53,9 @@ Documented sentinels only, with no thresholds tuned to Japan, so the rule carrie
   - The rule rejects 2 laps in the season: Hungary COL lap 2 (dead) and Miami HUL lap 2 (X/Y (0, 0)).
   - The 3 % car-vs-X/Y distance check stays as QC only. It flags 43 of 1,518 push laps, but 35 selected rows come from those laps, and most of their error comes from a freeze elsewhere on the lap rather than in the selected segment.
 - **"Lap end" segments (implemented):** a segment with no corner ahead within its lap is truncated by the lap boundary. At Monza these are the Parabolica-to-line stretch on laps where the driver lifted at the line; the main straight is measured across the line separately. Japan is unchanged by both rules.
+- **2025 vs 2026 Suzuka comparison (tried once, not debugged).** `run_session(2025, "Japan")` fails with `KeyError: 'Kick Sauber'` in `meta()`, because the team→PU mapping (`PU` in `flatout.py`) covers 2026 teams only. The OpenF1 key lookup works (2025 Japan = 10002).
+  - Next step: a year-specific team→PU mapping from a verified source (2025 engine supply differs from 2026), then compare vmax_position and clip_delta per straight with the same corner labels.
+  - This is also the only way to test The Race's claim that 2026 cars peak earlier than earlier cars.
 - **Madrid and Sepang** are included with what they contribute (sectors and, for Sepang, the main straight), with the reasons logged.
 
 ## Open issues
