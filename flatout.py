@@ -114,6 +114,14 @@ def position_at(xyd, pt, times):
     return xyd[np.abs(pt[:, None] - t[None, :]).argmin(axis=0)]
 
 
+def distance_agreement(laps):
+    """QC without an official length: per lap, car-data distance vs X/Y distance, % difference relative to X/Y."""
+    d = pd.DataFrame([dict(Driver=lap["Driver"], LapNumber=int(lap["LapNumber"]),
+                           CarData_m=lap.get_car_data().add_distance()["Distance"].iloc[-1], XY_m=xy_cumdist(lap_pos(lap))[-1])
+                      for _, lap in laps.iterlaps()])
+    return d.assign(Diff_pct=100 * (d.CarData_m / d.XY_m - 1))
+
+
 def lap_distance_check(laps, official_m):
     """Validation 1: distance of each lap from car data and from X/Y, with % error vs the official length."""
     v = pd.DataFrame([dict(Driver=d, PU=PU[lap["Team"]],
