@@ -7,7 +7,8 @@ A reproducible, season-wide measurement of full-throttle speed loss ("clipping")
 |---|---|
 | `flatout.py` | Pipeline module: constants (with citations), telemetry freeze flags, OpenF1 brake input, push-lap selection, sector PKE, full-throttle segments and clipping metrics, `run_session()`, `openf1_session_key()`, `caption()` |
 | `01_japan_validation.ipynb` | 2026 Japanese GP: validation, freeze evidence, results, robustness check, appendices |
-| `02_season.ipynb` | Season run: every 2026 main Qualifying session through `run_session()`, with a QC summary |
+| `02_season.ipynb` | Season run: every 2026 main Qualifying session through `run_session()`, with a QC summary and descriptive results |
+| `03_regulations.ipynb` | 2025 vs 2026 qualifying at the same circuits, paired by straight (run `02_season.ipynb` first) |
 | `figures/` | Figures exported as PDF |
 | `NOTES.md` | Decisions, deviations from spec, open issues |
 | `requirements.txt` | Python dependencies |

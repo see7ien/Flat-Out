@@ -42,6 +42,12 @@ PU = {  # The Race, "What engine every F1 team is using for 2026 rules"
     "Ferrari": "Ferrari", "Haas F1 Team": "Ferrari", "Cadillac": "Ferrari",
     "Aston Martin": "Honda", "Red Bull Racing": "Red Bull Ford", "Racing Bulls": "Red Bull Ford", "Audi": "Audi",
 }
+PU_2025 = {  # Sports Illustrated, "Formula 1 Engine Suppliers: Full List" (2025)
+    "Mercedes": "Mercedes", "McLaren": "Mercedes", "Williams": "Mercedes", "Aston Martin": "Mercedes",
+    "Ferrari": "Ferrari", "Haas F1 Team": "Ferrari", "Kick Sauber": "Ferrari",
+    "Red Bull Racing": "Honda RBPT", "Racing Bulls": "Honda RBPT", "Alpine": "Renault",
+}
+PU_BY_YEAR = {2025: PU_2025, 2026: PU}
 PU_COLORS = {"Mercedes": "#0072B2", "Ferrari": "#D55E00", "Red Bull Ford": "#E69F00", "Honda": "#CC79A7",
              "Audi": "#009E73"}  # Okabe-Ito, colour-blind safe; one fixed colour per PU in every figure
 STRAIGHT_COLORS = {"T13": "#4477AA", "T16": "#EE6677", "T1": "#228833"}  # Tol bright; T1 = main straight
@@ -92,6 +98,11 @@ def to_seconds(df):
 
 # ---------------------------------------------------------------- geometry and Validation 1
 
+def pu_of(lap):
+    """Power unit of the lap's team in the lap's season (PU_BY_YEAR)."""
+    return PU_BY_YEAR[lap.session.date.year][lap["Team"]]
+
+
 def lap_pos(lap):
     """Position data padded, then sliced to the lap with interpolated edges (HAC)."""
     return lap.get_pos_data(pad=1, pad_side="both").slice_by_lap(lap, interpolate_edges=True)
@@ -125,7 +136,7 @@ def distance_agreement(laps):
 
 def lap_distance_check(laps, official_m):
     """Validation 1: distance of each lap from car data and from X/Y, with % error vs the official length."""
-    v = pd.DataFrame([dict(Driver=d, PU=PU[lap["Team"]],
+    v = pd.DataFrame([dict(Driver=d, PU=pu_of(lap),
                            CarData_m=lap.get_car_data().add_distance()["Distance"].iloc[-1],
                            XY_m=xy_cumdist(lap_pos(lap))[-1])
                       for d, lap in laps.items()]).set_index("Driver")
@@ -281,7 +292,7 @@ def taper_kw(v):
 
 
 def meta(lap):
-    return dict(Driver=lap["Driver"], Team=lap["Team"], PU=PU[lap["Team"]], LapNumber=int(lap["LapNumber"]),
+    return dict(Driver=lap["Driver"], Team=lap["Team"], PU=pu_of(lap), LapNumber=int(lap["LapNumber"]),
                 QualiPart=lap["QualiPart"], LapTime=lap["LapTime"])
 
 
@@ -447,7 +458,9 @@ def run_session(year, event, official_length_m=None, openf1_session=None):
     sec_all_, seg_all_ = sector_segment_rows(push_, crn)
     ms_all_ = main_straight_rows(ses, push_)
     sectors_, straights_, main_, segments_ = select_clean(sec_all_, seg_all_, ms_all_)
-    frozen = pd.DataFrame([dict(PU=PU[lap["Team"]], FrozenPct=100 * freeze_mask(lap.get_car_data())[0].mean())
+    if year < 2026:  # C5.2.8 (taper) is a 2026 rule: no taper power for earlier seasons
+        segments_ = segments_.assign(taper_kw_at_peak=np.nan)
+    frozen = pd.DataFrame([dict(PU=pu_of(lap), FrozenPct=100 * freeze_mask(lap.get_car_data())[0].mean())
                            for _, lap in push_.iterlaps()])
     cols = ["Scope", "Driver", "LapNumber", "QualiPart", "Item", "Reason"]
     excl = concat_nonempty([
