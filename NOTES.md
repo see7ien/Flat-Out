@@ -1,35 +1,48 @@
-# Notes: Japan pipeline (13–14 Oct 2026)
+# Notes: Japan pipeline (final cleaning, 15 Oct 2026)
 
-## Decisions
-- **Freeze definition:** a run of unchanged Speed + RPM + nGear is a freeze if it contains `Throttle == 104`, or Brake = True with Throttle >= 98. The second case is the sentinel in the brake channel: OpenF1 shows `brake == 104` with `throttle == 100` on STR lap 8 (Table A2). A 1-sample buffer is added on each side. 104 during running is our observation (FastF1 documents it for stationary cars). The same freeze appears in OpenF1, so it originates upstream of FastF1.
-- **Brake is unreliable inside a freeze:** OpenF1 reports `brake == 104`, which FastF1 casts to `True`.
-- **Pipeline order:** flag freezes first, then detect full-throttle segments (Throttle >= 98, Brake off, single-sample dips merged, >= 500 m). Any sector or segment overlapping a freeze is dropped and logged, as is any segment whose peak is its first sample (start truncated).
-- **Push laps:** `pick_wo_box()`, `pick_quicklaps()` (107 %), `pick_not_deleted()`. The single deleted lap (track limits at T13, Spoon) stays excluded, because it affects exit speed onto the back straight.
-- **Lap selection:** per driver, per sector or straight, the latest quali part with a clean lap first, then the fastest lap within it. `QualiPart` is stored on every row.
-- **Main straight:** stitched across the timing line (±30 s of whole-session car data) and kept only if freeze-free on both sides. Flagged `CrossesTimingLine` (FIA C5.2.2: energy is accounted per lap at the timing line) and reported separately.
-- **Straight labels:** each straight is named after the corner it ends at, matched by X/Y. FastF1's corner `Distance` column is not used, because it is computed from `laps.pick_fastest()`, which here is ANT's frozen lap.
-- **Validation 2 (130R = T15):** pre-specified primary window = peak before T15 → minimum to T15 + 100 m. Sensitivity window = peak → segment end. F1Technical is an approximate reference, not ground truth.
-- **Sector PKE:** kept as a partial replication of Bopaiah & Samuel (2021), with coverage stated; no rescue attempts.
-- **PU mapping:** verified against The Race. **Notebook:** edited directly; the builder script is retired.
+All result numbers live in `analysis.ipynb`. Captions are computed from outputs with `caption()`, so they cannot go stale. The values quoted below are from the final Japan run.
+
+## Final freeze rule (locked)
+Documented sentinels only, with no thresholds tuned to Japan, so the rule carries over unchanged to the season.
+- **(a) Freeze:** a run of unchanged Speed + RPM + nGear containing `Throttle == 104`, plus a 1-sample buffer. Sectors and segments that overlap a freeze are dropped and logged; segments whose peak is their first sample are also dropped. 104 during running is our observation (FastF1 documents it for stationary cars). The same freeze appears in OpenF1, so it originates upstream of FastF1.
+- **(c) Brake unknown:** OpenF1 `brake == 104`. These samples do not end a full-throttle segment and are trimmed from a segment's end.
+- **(d) Genuine brake:** OpenF1 `brake == 100` at full throttle is left as is.
+- **(e) Implausible acceleration** (single-step increase >= 5 km/h above P/(m v), with P = 800 kW, m = 700 kg and drag ignored): **not a filter.** A segment gets `JumpFlag` if a jump lies in [first peak-speed sample − 1, segment end]. Key results are reported with and without flagged segments (Section 11, following Steegen et al. 2016). In Japan only STR lap 8 T14→T16 is flagged.
+- **(b) Speed/RPM ratio check:** rejected. It does not separate stale from updating Speed, so it is kept only as a diagnostic (Section 3.5).
+
+## OpenF1 input
+- OpenF1 brake values are a pipeline input. Each driver's `car_data` is downloaded once per session and cached in `cache/openf1/` (gitignored).
+- Without OpenF1 data, brake is taken at face value, and `run_session` records `brake_source = "no OpenF1: brake taken at face value"` in the QC summary.
+- The FastF1-only substitute was removed. It caught 65 of 75 sentinel samples, with 22 false positives (Appendix A3).
+- **Season run:** the OpenF1 `session_key` must be looked up for each qualifying session (not implemented; Japan is hard-coded as `OPENF1_SESSION = 11249`).
+
+## Other decisions
+- **Push laps:** `pick_wo_box()`, `pick_quicklaps()` (107 %), `pick_not_deleted()`. The deleted lap (track limits at T13, Spoon) is excluded because it affects exit speed onto the back straight.
+- **Lap selection:** per driver and per sector or straight, the latest quali part with a clean lap first, then the fastest lap within it. `QualiPart` is stored on every row.
+- **Main straight:** stitched across the timing line (±30 s of whole-session car data); flagged `CrossesTimingLine` (FIA C5.2.2) and reported separately.
+- **Straight labels:** named after the corner a segment ends at, matched by X/Y. FastF1's corner `Distance` column is not used, because it is computed from `laps.pick_fastest()`.
+- **Validation 2 (130R = T15):** primary window = peak before T15 → minimum to T15 + 100 m (pre-specified); sensitivity window = peak → segment end. F1Technical is an approximate reference, not ground truth.
+- **Sector PKE:** partial replication of Bopaiah & Samuel (2021), with coverage stated.
+- **Gradient:** comparisons within a straight are unaffected by gradient (the same for all cars); comparisons across straights are not.
+- **PU mapping:** verified against The Race. Figures are exported as PDF to `figures/`.
+
+## Limitations
+- Implausible jumps before the peak do not affect clip_delta or decel_rate (peak → end), but they do affect segment and sector PKE (secondary metric).
+- 291 implausible jumps occur on push laps, mostly within 300 m after a corner. They are a data-quality finding that adds noise to individual readings.
+- One or two cars per team, one lap each: comparisons are descriptive, not estimates of team or PU effects.
 
 ## Deviations from spec
-- **Validation 2 wording:** "first braking sample" became "last full-throttle sample before the driver lifts or brakes" (what the code does). "Correspond to" became "closest to" (what Table 13 shows).
-- **vmax_position:** reported as measured, not as 0.5: mean 0.50 (median 0.51, n = 20) after the brake-sentinel rule; 0.48 before it.
-- **Segers page ranges:** section 3.6 runs to p.75, not p.74. The braking-point sentence is on p.105; pp.104–105 is not cited, because we do not use longitudinal acceleration.
-- **Figure 3:** tied values are spread deterministically with one label per tie, instead of random jitter.
-- **Map (Figure 4):** the three straights use three accent colours (shared with Figure 5) instead of one.
-- **Known-bugs page:** the FastF1 "Known bugs" page returns 404; not cited.
+- **Validation 2 wording:** "first braking sample" became "last full-throttle sample before the driver lifts or brakes" (what the code does).
+- **Segers page ranges:** section 3.6 runs to p.75; the braking-point sentence is on p.105 (not cited, because we do not use longitudinal acceleration).
+- **Figures:** the strip plots spread tied values deterministically with one label per tie. The map uses three accent colours for the straights, shared with the taper figure.
+- **Numbering:** tables and figures are numbered automatically in order, so the planned "Figure 3b" is Figure 5.
+- **Not cited:** the FastF1 "Known bugs" page returns 404.
 - **Warning filter:** one numpy timedelta `DeprecationWarning`, raised inside pandas/FastF1, is silenced by its exact message.
 
 ## Open issues
-1. **The brake-sentinel rule may over-flag.** As specified, any Brake = True sample at full throttle seeds a freeze, even a 1-sample run. That flags all 167 such samples (on 70 of 108 push laps), not only the 45 inside unchanged runs.
-   - Coverage drops: sector rows 75 → 58 (full lap 16 → 6 drivers), segment rows 64 → 59, main straight 21 → 18 drivers.
-   - OpenF1 confirms 104 only for STR lap 8. Whether the other samples are also 104, or real left-foot braking, is unchecked.
-   - Options: check them in OpenF1, or require runs of >= 2–3 samples.
-2. **STR:** T12→T13 (lap 5, clip_delta 48 km/h) is kept as a valid outlier. T14→T16 (lap 8) is now flagged and excluded; no other STR lap gives a clean T14→T16 segment. The start-truncation rule removes nothing in Japan: STR's peak repeats over 3 samples, so its `vmax_position` was 0.05, not 0.
-3. **The 15 isolated `Throttle == 104` samples** are flagged but not inspected.
-4. **Validation 2 mismatch:** the primary window is 11.0–13.1 km/h from F1Technical; the segment-end window is 1.6–2.2 km/h. F1Technical's source, driver and lap per team, and minimum-speed location are unknown.
-5. **Unverified per-event inputs:** which events have reduced energy limits or the 50 kW/s ramp; post-Miami amendments are not in `refs/`. C5.2.8 is "subject to Article B7.2.1", which is in Section B (not in `refs/`).
-6. **Untested on other events:** `run_session` has only been run on Japan. Other events need their official circuit length for Validation 1, and Validation 2 is Japan-specific.
-7. **Sector PKE coverage:** S1 22, S2 15, S3 15, full lap 6 of 22 drivers; Honda has S1 and S2 (ALO only).
-8. **Map label:** the corner 11 label slightly touches the T12→T13 line in Figure 4.
+1. **Validation 2:** the primary window is about 11.6 km/h (mean drop difference) from F1Technical; the segment-end window is about 2.5 km/h. F1Technical's source, driver and lap per team, and minimum-speed location are unknown. On raw fastest laps, both windows are far off (15–25 km/h), because 8 of 12 raw laps contain freezes in T14–T16.
+2. **The 15 isolated `Throttle == 104` samples** are flagged but not inspected.
+3. **Unverified per-event inputs:** reduced energy limits, the 50 kW/s ramp, and post-Miami amendments are not in `refs/`. C5.2.8 is "subject to Article B7.2.1" (Section B, not in `refs/`).
+4. **Untested on other events:** `run_session` has only been run on Japan. Other events need their official circuit length (Validation 1) and an OpenF1 session key; Validation 2 is Japan-specific.
+5. **Map label:** the corner 11 label slightly touches the T12→T13 line in the map figure.
+6. **Steegen et al. (2016):** the PDF is still to be added to `refs/`.
