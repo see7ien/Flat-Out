@@ -34,7 +34,8 @@ FULL_THROTTLE = 98        # Throttle >= 98 % with Brake off (planned metric)
 MIN_SEGMENT_M = 500       # minimum full-throttle segment length (planned metric)
 ACC_POWER_W = 800e3       # upper bound on propulsive power: ERS-K 350 kW (FIA 2026 Tech Regs C5.2.7) + ICE ~400 kW (approx.), rounded up
 ACC_MASS_KG = 700         # deliberately below any 2026 car's mass, so the acceleration bound is lenient
-MIN_JUMP_KMH = 5          # (e) robustness check: only single-step Speed increases >= 5 km/h (guards against timestamp jitter)
+TAPER_ONSET_KMH = (1800 - 350) / 5  # 290 km/h: FIA 2026 Tech Regs C5.2.8 i (1800 - 5 v) meets the C5.2.7 350 kW cap
+MIN_JUMP_KMH = 5         # (e) robustness check: only single-step Speed increases >= 5 km/h (guards against timestamp jitter)
 OPENF1_CACHE = CACHE / "openf1"
 PU = {  # The Race, "What engine every F1 team is using for 2026 rules"
     "Mercedes": "Mercedes", "McLaren": "Mercedes", "Williams": "Mercedes", "Alpine": "Mercedes",
@@ -218,6 +219,19 @@ def xy_path(pos, t0, t1):
 
 # ---------------------------------------------------------------- push laps
 
+def dead_lap_reason(lap):
+    """Why a lap's channels are dead or missing ("" if usable): Speed zero for the whole lap, X/Y (0, 0) on any sample,
+    or X/Y stationary for the whole lap. No thresholds."""
+    car, pos = lap.get_car_data(), lap.get_pos_data()
+    if (car["Speed"] == 0).all():
+        return "dead data: Speed zero all lap"
+    if ((pos["X"] == 0) & (pos["Y"] == 0)).any():
+        return "missing data: X/Y (0, 0)"
+    if (pos[["X", "Y"]].diff().iloc[1:] == 0).all(axis=None):
+        return "missing data: X/Y stationary all lap"
+    return ""
+
+
 def push_laps(session):
     """Push laps with QualiPart, and a log of excluded timed laps with reasons."""
     timed = session.laps[session.laps["LapTime"].notna()]
@@ -227,6 +241,8 @@ def push_laps(session):
     reason[~timed.index.isin(timed.pick_wo_box().index)] = "in/out lap"
     reason[(reason == "") & ~timed.index.isin(timed.pick_quicklaps().index)] = "slower than 107 % (cool-down/aborted)"
     reason[(reason == "") & timed["Deleted"]] = "deleted: " + timed["DeletedReason"].str.strip()
+    for i, lap in timed[reason == ""].iterlaps():
+        reason[i] = dead_lap_reason(lap)
     timed = timed.assign(QualiPart=part)
     log = timed.loc[reason != "", ["Driver", "LapNumber", "QualiPart"]].assign(Reason=reason)
     return timed.loc[reason == ""], log
@@ -330,7 +346,7 @@ def sector_segment_rows(push, corners):
             ahead = [n for n, x in cpos.items() if x > p1]
             seg_rows.append(dict(meta(lap), Label=f"T{min(ahead, key=cpos.get)}" if ahead else "lap end",
                                  Via=",".join(f"T{n}" for n, x in cpos.items() if p0 < x < p1),
-                                 StartPos_m=p0, EndPos_m=p1, Truncated=i0 == 0 or i1 == len(car),
+                                 StartPos_m=p0, EndPos_m=p1, Truncated=i0 == 0 or i1 == len(car) or not ahead,  # no corner ahead: cut by lap end
                                  Frozen=bool(flag.iloc[i0:i1].any()), **segment_metrics(car.iloc[i0:i1], jumps.iloc[i0:i1])))
     seg = pd.DataFrame(seg_rows) if seg_rows else pd.DataFrame(columns=SEGMENT_COLUMNS).astype(
         {"Truncated": bool, "Frozen": bool, "JumpFlag": bool, "LapTime": "timedelta64[ns]"})

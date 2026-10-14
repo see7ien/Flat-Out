@@ -48,8 +48,12 @@ Documented sentinels only, with no thresholds tuned to Japan, so the rule carrie
 
 ## Next steps
 - **Data-driven straight labelling** as a fallback for venues without FastF1 circuit info: cluster segment end positions (X/Y lap position) across drivers and label each cluster by its median end position, instead of the next corner.
-- **Lap-level data checks (proposed, not implemented):** reject a push lap with dead or missing channels, which carry no 104 marker: X/Y position stationary or (0, 0) on any sample, or Speed zero for the whole lap. Keep the 3 % car-vs-X/Y distance check as reporting only. It flags 43 of 1,518 push laps, but 35 selected rows come from these laps, and most of their error comes from a freeze elsewhere on the lap rather than in the selected segment.
-- **"Lap end" segments (proposed):** treat a segment with no corner ahead within the lap as truncated by the lap boundary. At Monza these are the Parabolica-to-line stretch on laps where the driver lifted at the line; the main straight is measured across the line separately.
+- **Lap-level data checks (implemented):** `dead_lap_reason` rejects a push lap and logs it if Speed is zero for the whole lap, X/Y is (0, 0) on any sample, or X/Y is stationary for the whole lap. No thresholds.
+  - *Deviation:* "X/Y stationary on any sample" would have rejected 126 laps, 102 of them in China, because repeated position samples are normal there (median 4 per affected lap). So the condition is "stationary for the whole lap".
+  - The rule rejects 2 laps in the season: Hungary COL lap 2 (dead) and Miami HUL lap 2 (X/Y (0, 0)).
+  - The 3 % car-vs-X/Y distance check stays as QC only. It flags 43 of 1,518 push laps, but 35 selected rows come from those laps, and most of their error comes from a freeze elsewhere on the lap rather than in the selected segment.
+- **"Lap end" segments (implemented):** a segment with no corner ahead within its lap is truncated by the lap boundary. At Monza these are the Parabolica-to-line stretch on laps where the driver lifted at the line; the main straight is measured across the line separately. Japan is unchanged by both rules.
+- **Madrid and Sepang** are included with what they contribute (sectors and, for Sepang, the main straight), with the reasons logged.
 
 ## Open issues
 1. **Validation 2:** the primary window is about 11.6 km/h (mean drop difference) from F1Technical; the segment-end window is about 2.5 km/h. F1Technical's source, driver and lap per team, and minimum-speed location are unknown. On raw fastest laps, both windows are far off (15–25 km/h), because 8 of 12 raw laps contain freezes in T14–T16.
