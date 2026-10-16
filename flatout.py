@@ -3,7 +3,7 @@
 Validation, freeze flags (documented sentinels only), push-lap selection, sector PKE, full-throttle segments and
 clipping metrics, and run_session() for one qualifying session. Sources: FastF1 3.8.3 docs (HAC = "How to perform
 calculations accurately", TEL = Telemetry API reference, fastf1/core.py); FIA 2026 Technical Regulations Section C,
-Issue 12; Bopaiah & Samuel (2021), SAE 2021-01-0368; OpenF1 API (openf1.org).
+Issue 12, checked against Issue 20 (5 Aug 2026; same values); Bopaiah & Samuel (2021), SAE 2021-01-0368; OpenF1 API (openf1.org).
 """
 import json
 import urllib.request
@@ -285,7 +285,7 @@ def pke(car):
 
 
 def taper_kw(v):
-    """Max ERS-K power used to propel the car (kW) at speed v (km/h), outside Override Mode."""
+    """Max ERS-K power used to propel the car (kW) at speed v (km/h) when Overtake is not active (Override Mode in Issue 12)."""
     v = np.asarray(v, dtype=float)
     p = np.where(v < 340, 1800 - 5 * v, 6900 - 20 * v)  # FIA 2026 Tech Regs C5.2.8 i
     p = np.where(v >= 345, 0, p)                         # FIA 2026 Tech Regs C5.2.8 i
@@ -488,3 +488,26 @@ def run_session(year, event, official_length_m=None, openf1_session=None):
                                       "straight": segments_.groupby("Label").Driver.nunique()}),
                   frozen_by_pu=frozen.groupby("PU").FrozenPct.mean())
     return tables, qc
+
+
+def segment_grid(year, event, openf1_session, grid):
+    """Selected segments (labelled straights + main straight) of one session for each (FULL_THROTTLE, MIN_SEGMENT_M)
+    pair in `grid`: the segment-definition sensitivity check. Same selection as run_session; defaults restored after."""
+    global FULL_THROTTLE, MIN_SEGMENT_M
+    ses = load_quali(year, event)
+    load_openf1_brake(openf1_session, ses.drivers)
+    try:
+        crn = ses.get_circuit_info().corners.set_index("Number")
+    except Exception:  # no circuit info (FastF1 issue #692): main straight only, as in run_session
+        crn = None
+    push_, _ = push_laps(ses)
+    default, out = (FULL_THROTTLE, MIN_SEGMENT_M), []
+    try:
+        for thr, min_m in grid:
+            FULL_THROTTLE, MIN_SEGMENT_M = thr, min_m
+            sec_all_, seg_all_ = sector_segment_rows(push_, crn)
+            segments_ = select_clean(sec_all_, seg_all_, main_straight_rows(ses, push_))[3]
+            out.append(segments_.assign(Throttle=thr, MinLength_m=min_m))
+    finally:
+        FULL_THROTTLE, MIN_SEGMENT_M = default
+    return concat_nonempty(out, ignore_index=True)

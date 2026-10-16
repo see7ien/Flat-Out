@@ -8,7 +8,9 @@
 \usepackage{booktabs}
 \usepackage[round,authoryear]{natbib}
 \usepackage{xcolor}
-\usepackage{placeins}
+\usepackage[section]{placeins}
+\usepackage[font=small,labelfont=bf,skip=4pt]{caption}
+\usepackage{xurl}% breaks long URLs in the references
 \usepackage[hidelinks]{hyperref}
 
 \newcommand{\var}[1]{\texttt{#1}}
@@ -16,13 +18,14 @@
 
 % Float placement: allow large floats on text pages; top-align float-only pages.
 \renewcommand{\topfraction}{0.9}
-\renewcommand{\bottomfraction}{0.5}
+\renewcommand{\bottomfraction}{0.6}
 \renewcommand{\textfraction}{0.1}
 \renewcommand{\floatpagefraction}{0.8}
 \makeatletter
 \setlength{\@fptop}{0pt}
 \setlength{\@fpsep}{12pt}
 \makeatother
+\setlength{\textfloatsep}{12pt plus 2pt minus 2pt}
 
 \title{Full-Throttle Speed Loss in 2026 Formula One Qualifying:\\
 A Descriptive Measurement from Public Telemetry}
@@ -33,199 +36,217 @@ A Descriptive Measurement from Public Telemetry}
 \maketitle
 
 \begin{abstract}
-The 2026 Formula One technical regulations raise the maximum power of the kinetic motor generator unit (MGU-K) to 350~kW and make it decrease with speed above 290~km/h. One visible consequence is \emph{clipping}: cars lose speed on straights while the driver is still at full throttle. We measure this effect in every 2026 qualifying session held up to the Singapore Grand Prix, using public FastF1 telemetry checked against OpenF1. The data are cleaned with documented sentinel values only. Across 41 reportable straights in 16 sessions (842 driver-straights), 86\% of driver-straights reach their peak speed before the end of the full-throttle segment. Differences between power-unit manufacturers are small: the five median values span 2.1~km/h, about the same as the median gap between teammates (2.0~km/h). On 39 straights matched between 2025 and 2026 at 15 circuits, all 33 straights that show clipping have an earlier peak and a larger speed loss in 2026; the other 6 show no clipping in either year. The analysis is descriptive and makes no causal claims.
+The 2026 Formula One technical regulations nearly triple the power of the kinetic motor generator unit (MGU-K), to 350~kW, and reduce that power with speed above 290~km/h. One visible consequence is \emph{clipping}: cars lose speed on straights while the driver is still at full throttle. We measure this effect in every 2026 qualifying session held up to the Singapore Grand Prix, using public FastF1 telemetry checked against OpenF1 and cleaned with documented sentinel values only. Across 41 reportable straights in 16 sessions (842 driver-straights), 86\% of driver-straights reach their peak speed before the end of the full-throttle segment. Differences between power-unit manufacturers are small: the five median values span 2.1~km/h, about the same as the median gap between teammates (2.0~km/h). On 39 straights matched between 2025 and 2026 at 15 circuits, all 33 straights that show clipping have an earlier peak and a larger speed loss in 2026; the other 6 show no clipping in either year. The analysis is descriptive and makes no causal claims.
 \end{abstract}
 
 % ---------------------------------------------------------------------------
 \section{Introduction}
 
-Since 2014 the Formula One power unit (PU) has combined a turbocharged internal-combustion engine with an energy recovery system. \citet{bopaiah2021} studied that system for the 2019 Australian Grand Prix qualifying session. They reconstructed speed traces from broadcast data and checked the reconstructed lap distance against the official track length. They then compared drivers within a team, teams sharing a PU, and the whole field, using positive kinetic energy as a proxy for energy deployment.
+The 2026 Formula One regulations moved the sport much further towards electrical power. The MGU-K, the motor-generator on the drivetrain, may now deliver 350~kW instead of 120~kW, while the heat-recovery unit on the turbocharger has been removed \citep{fia2026c, medland2026rules}. The battery therefore has to be recharged far more often from the car's own kinetic energy, and the regulations ration both how much energy may be recovered on each lap and how much electrical power may be used at high speed. From pre-season testing onwards, drivers and commentators described a new behaviour: cars that stop accelerating, or visibly slow, before the braking point on a straight, with the driver still flat out \citep{noble2026superclipping, noble2026leclerc, f1technical2026}.
 
-Speed lost while the driver is at full throttle is lap time that cannot be recovered on that straight. The energy the 2026 cars may harvest per lap is also capped \citep[C5.2.10]{fia2026c}, so where that energy is spent, and where a car runs short of it, is a central question of 2026 energy management. Public analysis has so far examined individual laps and circuits \citep{f1technical2026}; to our knowledge, there is no systematic, season-wide public measurement of the effect.
+That behaviour matters because speed lost at full throttle is lap time that cannot be recovered on that straight. It also raised sporting and safety concerns. After the first three rounds, the FIA, teams and power-unit (PU) manufacturers agreed changes to the energy rules for qualifying, which applied from the Miami Grand Prix \citep{fia2026refinements}. Yet the public evidence for the effect remains anecdotal: single laps, single corners, and broadcast speed traces \citep{noble2026leclerc, f1technical2026}. To our knowledge, nobody has yet measured the effect systematically across a season from public data.
 
-The 2026 regulations change the balance between the engine and the electrical system \citep{fia2026c}. The MGU-K may deliver up to 350~kW (Article C5.2.7), but its permitted power falls with speed (Article C5.2.8). Commentators have described cars losing speed before the braking point on straights, a behaviour called clipping or ``superclipping'' \citep{f1technical2026, therace2026fix}.
+Energy-limited deployment has a well-developed theory. Optimal-control studies of the 2014--2025 hybrid power unit show that, under a fixed energy budget per lap, the lap-time-optimal strategy spends electrical energy unevenly. It is concentrated where it saves the most time, so some parts of the lap are deliberately run with less electrical support \citep{limebeer2014ers, salazar2017policy, ebbesen2018timeoptimal}. Those studies use team-grade models and data. Work from public data is rarer. \citet{bopaiah2020strategy} reconstructed energy-recovery use from on-board broadcast graphics. \citet{bopaiah2021} compared drivers, teams sharing a PU, and the whole field in a single qualifying session, using positive kinetic energy as a proxy for deployment. Statistical studies of Formula One performance have so far worked from race results rather than telemetry \citep{bell2016formula, vankesteren2023bayesian}.
 
-This paper measures that behaviour across the 2026 season from public data. We follow the structure and validation approach of \citet{bopaiah2021}, but differ in three ways. Every excluded lap and segment is logged with a reason. Results are continuous measurements rather than normalised modes. And the analysis covers a season instead of one session. We ask three descriptive questions:
+This paper measures full-throttle speed loss across the 2026 season from public telemetry. It follows the validation approach of \citet{bopaiah2021}, checking reconstructed lap distance against the official track length, and extends it in three directions. Every lap and segment it excludes is logged with a reason, so each result can be traced back to the raw data. It reports continuous measurements in physical units, rather than normalised modes. And it covers a whole season, with a matched set of 2025 sessions for comparison, rather than one session. We ask three descriptive questions:
 \begin{enumerate}
   \item Where on a straight do 2026 cars reach their peak speed, and how much speed do they lose after it?
   \item How large are the differences between PU manufacturers compared with the differences between teammates?
   \item How do the same straights compare between 2025 and 2026?
 \end{enumerate}
-Section~\ref{sec:results} answers them in that order. We fit no statistical models and run no hypothesis tests. All comparisons are descriptive.
+Section~\ref{sec:season} answers the first two from the 2026 season alone, and Section~\ref{sec:years} answers the third.
 
-\FloatBarrier
 % ---------------------------------------------------------------------------
 \section{Background}
 
-\subsection{The 2026 power unit}
+\subsection{From the 2014 hybrid power unit to 2026}
 
-In the regulations studied by \citet{bopaiah2021}, the PU had six elements. Among them were an MGU-K limited to 120~kW and a heat motor generator unit (MGU-H) on the turbocharger. In 2026, only the engine and the kinetic energy recovery system (ERS-K) may propel the car or harvest energy (C5.2), so there is no MGU-H. The electrical power of the ERS-K is limited to 350~kW (C5.2.7) \citep{fia2026c}. The 2026 front and rear wings can also switch between a ``Corner Mode'' and a lower-incidence ``Straight-Line Mode'' position (C3.10, C3.11).
+From 2014 to 2025, the Formula One power unit combined a 1.6-litre turbocharged engine with two motor-generators. The MGU-K, on the drivetrain, recovered energy under braking and returned it as propulsion. The MGU-H, on the turbocharger, recovered energy from the exhaust. The MGU-K was limited to 120~kW and could recover at most 2~MJ per lap, but energy through the MGU-H was unrestricted, so a car could deploy up to 4~MJ per lap from its energy store \citep{bopaiah2020strategy, bopaiah2021, limebeer2014ers}.
 
-The \emph{MGU-K} is the electric motor-generator connected to the drivetrain. It recovers energy under braking and returns it as propulsion.
+The 2026 regulations remove the MGU-H. Only the engine and the kinetic energy recovery system (ERS-K) may now propel the car or recover energy (Article C5.2.1), and the ERS-K's electrical power rises to 350~kW (C5.2.7) \citep{fia2026c}.\footnote{Article numbers and values refer to Issue 20 of Section C (5 August 2026). Compared with Issue 12 (June 2025), every value used here is unchanged. Two modes have been renamed (Override Mode is now Overtake, and Straight-Line Mode is now Straight Mode), and the event-level reductions of the recovery limit in C5.2.10 now reach 7~MJ, and 4~MJ in qualifying.} The engine now supplies only about half of the total power \citep{medland2026rules}, and the energy the ERS-K may recover rises to 8.5~MJ per lap (C5.2.10), more than four times the previous MGU-K limit. Because that energy can now come only from the MGU-K, the car has to harvest it from its own motion: under braking, on partial throttle, or by running the MGU-K as a generator against the engine. The cars are also lighter and smaller. DRS is gone: Overtake, a mode with extra electrical power at high speed (C5.2.8\,ii), replaces it as the overtaking aid, and the front and rear wings now switch between a ``Corner Mode'' and a lower-drag ``Straight Mode'' (C3.10, C3.11) \citep{fia2026c, medland2026rules}. Table~\ref{tab:rules} summarises the changes that bear on this study.
 
-\subsection{The C5.2.8 power taper}
-
-Article C5.2.8\,i limits the MGU-K power used to propel the car to $P = 1800 - 5v$~kW for $v < 340$~km/h, to $6900 - 20v$~kW for $340 \le v < 345$~km/h, and to zero at 345~km/h and above \citep{fia2026c}. Together with the 350~kW cap of C5.2.7, this gives full power up to
-\begin{equation}
-  v_\text{onset} = \frac{1800 - 350}{5} = 290~\text{km/h},
-\end{equation}
-and a linear reduction above it (Figure~\ref{fig:taper}). In plain terms, the faster the car goes beyond 290~km/h, the less electrical power it is allowed to use. We call this the \emph{C5.2.8 taper}. C5.2.8 is subject to Article B7.2.1 of the Sporting Regulations, which we do not analyse.
-
-\begin{figure}[tbp]
+\begin{table}[!htbp]
   \centering
-  \includegraphics[width=\textwidth]{fig_taper.pdf}
-  \caption{Maximum MGU-K power used to propel the car vs speed, FIA 2026 Technical Regulations Section C, Issue 12 \citep{fia2026c}: C5.2.8\,i (solid) and Override C5.2.8\,ii (dashed), both capped at 350~kW by C5.2.7. Ticks show the peak speed of each selected segment at Suzuka 2026: T12$\to$T13 281--301~km/h, T14$\to$T16 316--338~km/h, main straight 308--333~km/h.}
+  \caption{Power-unit and car rules relevant to full-throttle speed loss, 2025 and 2026.}
+  \label{tab:rules}
+  \small
+  \begin{tabular}{lll}
+    \toprule
+     & 2014--2025 & 2026 \\
+    \midrule
+    MGU-K maximum power & 120 kW & 350 kW, reduced above 290 km/h \\
+    MGU-K energy recovered per lap & 2 MJ & 8.5 MJ, lower at some events \\
+    MGU-H & Fitted; energy unrestricted & Removed \\
+    Drag reduction & DRS (rear wing) & Straight Mode (both wings) \\
+    Overtaking aid & DRS & Overtake (extra MGU-K power) \\
+    \bottomrule
+  \end{tabular}
+
+  \smallskip
+  {\footnotesize Sources: \citet{bopaiah2020strategy, bopaiah2021}; \citet{fia2026c}; \citet{medland2026rules}.}
+\end{table}
+
+\subsection{Power reduction at high speed}
+
+The 350~kW limit applies only at lower speeds. Article C5.2.8\,i limits the MGU-K power used to propel the car to $P = 1800 - 5v$~kW for $v < 340$~km/h, to $6900 - 20v$~kW for $340 \le v < 345$~km/h, and to zero at 345~km/h and above \citep{fia2026c}. Combined with the 350~kW cap, the car has full electrical power up to
+\begin{equation}
+  v_\text{onset} = \frac{1800 - 350}{5} = 290~\text{km/h}.
+\end{equation}
+Above this speed, the permitted power falls by 5~kW for every additional km/h, to 100~kW at 340~km/h and zero at 345~km/h (Figure~\ref{fig:taper}). Overtake, whose use is governed by the Sporting Regulations, shifts the curve to higher speeds (C5.2.8\,ii). Many 2026 straights cross the onset. At Suzuka, for example, peak speeds on the three straights measured here ranged from 281 to 338~km/h: the T12$\to$T13 straight peaks around the onset, and the other two well above it.
+
+\begin{figure}[!htbp]
+  \centering
+  \includegraphics[width=0.75\textwidth]{fig_taper.pdf}
+  \caption{Maximum MGU-K propulsion power against speed under Article C5.2.8 (solid) and with Overtake active (dashed). Ticks mark the peak speeds on the three Suzuka straights measured in 2026.}
   \label{fig:taper}
 \end{figure}
 
-\subsection{Why clipping occurs}
-
-A car accelerates while its propulsive power exceeds the power needed to overcome drag and other resistances. It slows down when the propulsive power falls below that need. If the electrical contribution is reduced or stops, the car can lose speed while the driver holds full throttle. This can happen through the taper, or because the energy store is not deploying. Energy is limited too. The ERS-K may harvest at most 8.5~MJ per lap, and at some events the FIA may reduce this to no less than 5~MJ in qualifying (C5.2.10). The energy store's state of charge may vary by at most 4~MJ while the car is on track (C5.2.9).
-
-We use \emph{clipping} to mean exactly the observable: speed falling within a full-throttle segment. Telemetry does not show the state of charge, so we cannot say which mechanism causes a given loss.
-
-\subsection{Two periods of the 2026 season}
-
-Rule amendments took effect from the Miami Grand Prix (round 4). We do not analyse what they changed. We use the date only to split the season into a pre-Miami period (3 sessions) and a post-Miami period (14 sessions), because data quality differs between the two (Section~\ref{sec:freeze}).
-
 \FloatBarrier
+\subsection{Clipping and superclipping}
+
+On a straight, a car accelerates while its propulsive power exceeds the power needed to overcome aerodynamic drag and rolling resistance. Drag force grows with the square of speed, so the power it absorbs grows with the cube \citep{milliken1995racecar}. When propulsive power falls below that requirement, the car slows down even if the driver keeps the throttle fully open. In 2026, three mechanisms can cause this. The electrical power can be reduced by the speed-dependent limit above. The car can run out of energy that it is permitted, or has chosen, to deploy on that straight. Or the MGU-K can be switched into generator mode, taking power from the engine to recharge the battery. Commentators call the second \emph{clipping}, a term that predates 2026, and the third \emph{superclipping} \citep{mitchellmalm2026weird, noble2026superclipping, racer2026clipping}. Superclipping is typically used at the end of straights, where recovering energy costs the least lap time, and its peak power was capped by the regulations \citep{noble2026superclipping, fia2026refinements}.
+
+Public telemetry cannot tell these mechanisms apart. The car-data stream carries six channels (Speed, RPM, gear, Throttle, Brake and DRS) at roughly 4~Hz \citep{fastf1, openf1}. It includes no ERS channel: no MGU-K power or torque, no energy store state of charge, and no indication of whether the MGU-K is deploying or harvesting. In this paper, \emph{clipping} therefore refers to the observable outcome, speed falling within a full-throttle segment, whatever its cause.
+
+\subsection{In-season changes and the Miami split}
+
+The first rounds made the cost of the new rules visible. Drivers complained that qualifying laps had become exercises in energy management, with part-throttle running and long superclipping phases. In one case a car lost up to 15~km/h for much of a straight compared with the same driver's previous run \citep{noble2026leclerc}. The FIA first lowered the maximum energy that could be recharged in qualifying, from 9 to 8~MJ, for the Japanese Grand Prix \citep{f1technical2026suzuka}. On 20 April the FIA, teams, PU manufacturers and Formula One Management agreed a wider package, which took effect from the Miami Grand Prix \citep{fia2026refinements}. For qualifying, the maximum recharge fell from 8 to 7~MJ, with the stated aim of limiting superclipping to roughly two to four seconds per lap, and peak superclipping power rose from 250 to 350~kW. Lower energy limits could also now be applied at 12 events instead of 8.
+
+These changes act directly on the quantity measured here. Less energy to recover should shorten superclipping phases. A higher harvesting power makes each phase shorter but sharper. We therefore split the season into a pre-Miami period (Australia, China and Japan; 3 sessions) and a post-Miami period (14 sessions). The two periods also differ in data quality (Section~\ref{sec:freeze}), and no circuit appears in both, so we report the split but do not attribute the difference between the periods to the rule changes (Section~\ref{sec:limits}).
+
 % ---------------------------------------------------------------------------
-\section{Data}
+\section{Data and measurement}
+\label{sec:data}
 
-\subsection{Source and sessions}
+\subsection{Sources and sessions}
 
-Telemetry comes from FastF1~3.8.3 \citep{fastf1}. FastF1 serves the official live-timing car data (Speed, RPM, nGear, Throttle, Brake) and position data (X/Y). Brake values are cross-checked against the OpenF1 \var{car\_data} endpoint \citep{openf1}, which was available for every session used.
+Telemetry comes from FastF1 version~3.8.3 \citep{fastf1}, an open-source Python package that serves the official Formula One live-timing feed: car data (Speed, RPM, gear, Throttle, Brake) and position data (X/Y). FastF1 has been used in the same way in recent peer-reviewed work \citep{cappello2026tire}. Brake values are cross-checked against the \var{car\_data} endpoint of OpenF1 \citep{openf1}, which was available for every session used.
 
-Seventeen 2026 qualifying sessions were held up to the Singapore Grand Prix (10 October 2026). The Bahrain and Saudi Arabian rounds were cancelled, and the Bahrain Grand Prix was held at Sepang. FastF1 has no corner positions for Madrid or Sepang \citep{fastf1issue692}, so no corner-labelled straights could be defined there. Madrid contributes no reportable straight, and Sepang contributes its main straight only. For 2025 we use the 15 qualifying sessions held at circuits that were also raced in 2026, matched by OpenF1 \var{circuit\_key}. Team-to-PU mappings come from \citet{therace2026engines} for 2026 and \citet{si2025engines} for 2025.
+The 2026 calendar was announced with 24 rounds. The Bahrain and Saudi Arabian Grands Prix, scheduled for April, were cancelled in March because of the conflict in the Middle East, which left 22 rounds \citep{sky2026cancel}. The Bahrain Grand Prix was later restaged at the Sepang circuit in Malaysia in October, so the season now has 23 rounds \citep{f12026malaysia}. Seventeen qualifying sessions had been held by the Singapore Grand Prix (10 October 2026), and all are included. FastF1 has no corner positions yet for the new Madrid circuit or for Sepang, which last hosted Formula One in 2017 \citep{fastf1issue692}, so straights there cannot be labelled by the corner they end at. Sepang therefore contributes only its main straight, and Madrid no reportable straight. For 2025, we use the 15 qualifying sessions held at circuits that were also raced in 2026, matched by OpenF1 \var{circuit\_key}.
 
 \subsection{Validation of distance}
 
-Following \citet{bopaiah2021}, we checked each driver's fastest-lap distance at Suzuka 2026 against the official length of 5.807~km. Distance integrated from X/Y position erred by $-0.83$ to $-0.43$\% (mean $|\text{error}|$ 0.58\%). Distance from car-data speed had a mean $|\text{error}|$ of 1.48\% and a maximum of 7.37\%. For comparison, \citet{bopaiah2021} report a mean error below 0.6\% and a maximum below 1.8\% for their reconstructed data. The large car-data errors come from frozen samples, described next.
+Following \citet{bopaiah2021}, we checked each driver's fastest-lap distance at Suzuka 2026 against the official track length of 5.807~km. Distance integrated from X/Y position was within $-0.83$ to $-0.43$\% (mean absolute error 0.58\%). Distance integrated from car-data speed had a mean absolute error of 1.48\% and a maximum of 7.37\%. For comparison, \citet{bopaiah2021} report a mean error below 0.6\% and a maximum below 1.8\% for their reconstructed data. The larger car-data errors come from frozen samples, described next.
 
 \subsection{Frozen samples}
 \label{sec:freeze}
 
-Car data sometimes freeze: Speed, RPM and gear stay constant while the car keeps moving. On the 2026 Suzuka pole lap, car data froze at 189~km/h for 25.8~s. The same freezes appear in OpenF1, so they originate upstream of FastF1. Freezes are much more common in some sessions than in others (Figure~\ref{fig:freeze}). Mean freeze share on push laps was 7.0\% before Miami and 0.2\% from Miami onwards, and in 2025 it ranged from 0.00 to 0.06\% per session. Segments that overlap a freeze are dropped. The cleaning rules use documented sentinel values only and are given in full in Appendix~\ref{app:cleaning}.
+Car data sometimes freeze: Speed, RPM and gear stay constant while the car keeps moving. On the 2026 Suzuka pole lap, car data froze at 189~km/h for 25.8~s. The same freezes appear in OpenF1, so they originate upstream of FastF1. Figure~\ref{fig:freeze} shows how unevenly they are distributed. In 2025, the share of frozen samples on push laps never exceeded 0.06\% at any paired circuit. In 2026 it reached 10.6\%, with Shanghai, Suzuka and Monza above 1\%. Averaged by period, the freeze share was 7.0\% before Miami and 0.2\% from Miami onwards. Any segment that overlaps a freeze is dropped. Freezes are detected only from values that FastF1 documents, with no tuned thresholds; the rules are given in full in Appendix~\ref{app:cleaning}.
 
-\begin{figure}[tbp]
+\begin{figure}[!htbp]
   \centering
   \includegraphics[width=\textwidth]{fig_regs_freeze_calendar.pdf}
-  \caption{Freeze share (\% of push-lap car-data samples) per paired circuit (2026 calendar order) and year. 2025 range 0.00--0.06\%; 2026 range 0.00--10.60\%. Circuits above 1\% in 2026: Shanghai, Suzuka, Monza.}
+  \caption{Share of push-lap car-data samples that are frozen, per paired circuit (2026 calendar order) and year.}
   \label{fig:freeze}
 \end{figure}
 
-\subsection{Laps, segments and straights}
+\subsection{Push laps and full-throttle segments}
 
-\emph{Push laps} are laps not involving the pit lane, within 107\% of the session's fastest lap, and not deleted by the stewards (FastF1 \var{pick\_wo\_box}, \var{pick\_quicklaps}, \var{pick\_not\_deleted}). We also reject laps whose speed is zero throughout, whose X/Y position is $(0,0)$ on any sample, or whose X/Y position is stationary throughout.
+\emph{Push laps} are laps that do not involve the pit lane, are not deleted by the stewards, and are within 107\% of the session's fastest lap time. The 107\% threshold is FastF1's default for identifying representative laps \citep{fastf1}, borrowed from the qualifying cut-off in the Sporting Regulations \citep{fia2026sporting}. It removes out-laps, cool-down laps and aborted laps, which would otherwise be mistaken for clipping. We also reject laps whose speed is zero throughout, whose X/Y position is $(0,0)$ on any sample, or whose position does not change at all.
 
-A \emph{full-throttle segment} is a run of samples with Throttle~$\ge 98$ and brake off (or unknown), at least 500~m long, with single-sample dips merged. Each segment is labelled by the corner it ends at, matched by X/Y position to FastF1's corner list (Figure~\ref{fig:map}). The main straight is stitched across the timing line and reported separately. For each driver and straight we keep one lap: the latest qualifying part with a clean segment first, then the fastest lap within it. A straight is \emph{reportable} in a session only if at least 10 drivers have a clean segment on it. This gives 41 reportable straights in 16 sessions (842 driver-straights): 8 straights before Miami and 33 from Miami onwards.
+A \emph{full-throttle segment} is a run of consecutive samples with the throttle at 98\% or more and the brake off (or unknown), at least 500~m long. FastF1 records Throttle as pedal position from 0 to 100\% \citep{fastf1}. A threshold slightly below 100 keeps a straight intact when the reading dips marginally below full pedal. For the same reason, a single sample below the threshold does not end a segment. At about 4~Hz, one sample spans roughly 20~m at 300~km/h, so a one-sample dip is far too short to be a deliberate lift. The 500~m minimum (about 25 samples at that speed) keeps genuine straights and excludes short bursts of throttle between corners, where the car is still accelerating and the position of the peak carries little information. Neither choice drives the conclusions. Across throttle thresholds of 95, 98 and 100\% and minimum lengths of 300, 500 and 800~m (Appendix~\ref{app:sens}), most driver-straights peak before the segment end and the median paired 2025--2026 difference is positive in all nine combinations. The only exception to the straight-by-straight count is Silverstone T16, a segment of about 310~m that qualifies only at the 300~m minimum and whose median loss is below 1~km/h in both years. The throttle threshold barely changes the results; the minimum length changes their size, because longer minimums keep only long straights, which peak earlier and lose more speed. This is the same confounding with straight length discussed in Section~\ref{sec:res-peak}.
 
-\begin{figure}[tbp]
+Each segment is labelled by the corner it ends at, matched by X/Y position to FastF1's corner list (Figure~\ref{fig:map}). The main straight is stitched across the timing line and reported separately. For each driver and straight we keep one lap: from the latest qualifying part in which the driver has a clean segment on that straight, the fastest such lap. A straight is \emph{reportable} in a session only if at least 10 drivers have a clean segment on it. This gives 41 reportable straights in 16 sessions (842 driver-straights): 8 straights before Miami and 33 from Miami onwards.
+
+\begin{figure}[!htbp]
   \centering
   \includegraphics[width=0.48\textwidth]{fig_suzuka_map_a.pdf}
-  \caption{Suzuka reference map, 2026: FIA sectors, corner numbers, start/finish with direction of travel, the three measured straights, and T15 (130R).}
+  \caption{Suzuka, 2026: FIA sectors, corner numbers, start/finish with direction of travel, and the three measured straights.}
   \label{fig:map}
 \end{figure}
 
-For 2025 vs 2026, a straight is matched if the same label exists at the same circuit in both years with at least 10 clean drivers each. This yields 39 matched straights at 15 circuits.
-
 \FloatBarrier
-% ---------------------------------------------------------------------------
-\section{Method}
-
 \subsection{Segment metrics}
 
-For each selected segment, with distance $d$ from its start and length $L$:
+For each selected segment, with distance $d$ from its start and length $L$, we record four quantities.
 \begin{itemize}
-  \item \var{peak\_speed}: the maximum speed in the segment. Where several samples tie, the last one is used, so a plateau at top speed does not count as a loss.
+  \item \var{peak\_speed}: the maximum speed in the segment. If the maximum is reached on several samples, we take the last of them.
   \item \var{vmax\_position} $= d_\text{peak}/L$: where the peak occurs, from 0 (segment start) to 1 (segment end). A value below 1 means the car reached its top speed before the driver lifted or braked.
   \item \var{clip\_delta} $=$ \var{peak\_speed} $-$ \var{end\_speed}: the \emph{speed lost after the peak} (km/h), measured up to the last full-throttle sample.
   \item \var{decel\_rate} $= 100\,\cdot$ \var{clip\_delta}$/(L - d_\text{peak})$: the speed lost per 100~m after the peak.
 \end{itemize}
-Speed is reported in integer km/h, so a drag-limited plateau can register a peak before the segment end with negligible loss. We therefore also report the share of drivers with \var{clip\_delta}~$\ge 2$~km/h. In the paired comparison, a straight \emph{shows no clipping} if its median \var{clip\_delta} is zero in both 2025 and 2026. Every other matched straight counts as a straight \emph{with clipping}.
+Speed is reported in whole km/h, so a car running at a constant, drag-limited top speed can register a peak slightly before the segment end with no real loss. We therefore also report the share of drivers with \var{clip\_delta}~$\ge 2$~km/h.
 
-\subsection{Aggregation}
+All comparisons in this paper are descriptive. There is one lap per driver, and straights at the same circuit are not independent of one another, so formal significance tests would overstate the evidence. We report counts, medians and interquartile ranges (IQR) instead.
 
-Each plotted value is aggregated as follows.
-\begin{itemize}
-  \item \textbf{Peak position and speed loss, 2026} (Section~\ref{sec:res-peak}): raw values, one point per driver-straight. The split at the taper onset uses each driver-straight's own peak speed.
-  \item \textbf{PU comparison, 2026} (Section~\ref{sec:res-pu}): for each straight in each session, we subtract the straight's mean over all clean drivers from each driver's value (\emph{centering}). We then pool driver-straights by PU and report median and IQR. Centering removes effects common to all cars on a straight, including gradient. The split by regime assigns a whole straight by its median peak speed.
-  \item \textbf{2025 vs 2026, speed signature} (Section~\ref{sec:res-years}, Figure~\ref{fig:signature}): medians and IQR over all driver-straights in a year.
-  \item \textbf{2025 vs 2026, per straight} (Section~\ref{sec:res-years}, Figures~\ref{fig:dumbbell} and~\ref{fig:maps}, Table~\ref{tab:paired}): for each matched straight and year, we take the median over drivers (one lap each). We then take the difference 2026~$-$~2025 per straight, and the median and IQR of that difference across straights.
-\end{itemize}
-2026 is pooled across PUs in the year comparison because the PU differences in the season were small (Section~\ref{sec:res-pu}). That is not proof that there are none.
-
-\subsection{Robustness checks}
-\label{sec:robust}
-
-We used two checks on the paired comparison. First, we checked whether a straight's median segment end point moved more than 50~m between years, using position data, which could indicate a changed braking point or label. Second, we excluded sessions with rain recorded in FastF1 weather data.
-
-\FloatBarrier
 % ---------------------------------------------------------------------------
-\section{Results}
-\label{sec:results}
+\section{The 2026 season}
+\label{sec:season}
 
-\subsection{2026 cars usually peak before the end of the straight}
+The results in this section use all 842 driver-straights. The first subsection uses the raw values. For the comparison between PU manufacturers, each straight's mean over all its clean drivers is first subtracted from each driver's value (\emph{centring}). This removes everything common to all cars on a straight, such as its length, gradient and the energy limit set for that event, so that what remains reflects differences between cars and drivers. Centred values are then pooled by PU.
+
+\subsection{Most 2026 cars peak before the end of the straight}
 \label{sec:res-peak}
 
-In 2026 qualifying, most cars reach their peak speed before the end of the full-throttle segment and then lose speed while still at full throttle. Of the 842 driver-straights, 86\% peak before the segment end, with a median \var{vmax\_position} of 0.76 (Figure~\ref{fig:vmax}). \citet{therace2026fix} describes 2026 cars peaking earlier on a straight than earlier cars; the 2026 data alone cannot test that comparison, which Section~\ref{sec:res-years} makes with 2025 data.
+In 2026 qualifying, most cars reach their peak speed before the end of the full-throttle segment and then lose speed while still at full throttle. Figure~\ref{fig:vmax} shows where the peak falls. If cars accelerated all the way to the braking point, the histogram would be a single bar at 1. Instead, 86\% of the 842 driver-straights peak before the segment end, and the median peak position is 0.76, about three-quarters of the way along the straight. This matches descriptions of 2026 cars peaking earlier on a straight than earlier cars \citep{therace2026fix}, but the 2026 data alone cannot test that comparison; Section~\ref{sec:years} makes it with 2025 data.
 
-\begin{figure}[bp]% bottom/page only: a top float here lands above the Results heading
+How much speed is lost after the peak depends on how fast the car is going, but not in a simple way (Figure~\ref{fig:scatter}). Each point is one driver-straight, and the black line follows the median in 5~km/h bins of peak speed. The median loss is \emph{higher} below the 290~km/h onset than above it: 13.0~km/h for the 106 driver-straights that peak below it, against 11.0~km/h for the 736 that peak at or above it. Below the onset, the speed-dependent limit does not restrict power. Four of the five straights whose median peak is below the onset contain at least one corner taken flat out (Shanghai T8, Monaco T10, Spa-Francorchamps T12 and Baku T15), where cars lose speed through drag and cornering load whatever the power available; the fifth, the Montreal main straight, contains none. Above the onset, the loss rises with peak speed (Spearman $\rho = 0.36$; \citealp{spearman1904}). This is consistent with the speed-dependent limit, but it does not show that the limit causes the loss. Peak speed is confounded with straight length: longer straights allow higher peak speeds and also leave more distance over which to lose speed. Circuit is confounded with both.
+
+\begin{figure}[!htbp]
   \centering
-  \includegraphics[width=0.48\textwidth]{fig_season_vmax_position.pdf}
-  \caption{Where on the straight the peak speed occurs (\var{vmax\_position}), all 842 driver-straights on 41 reportable straights: 86\% peak before the segment end; median 0.76 (dashed).}
+  \includegraphics[width=0.6\textwidth]{fig_season_vmax_position.pdf}
+  \caption{Where on the straight the peak speed occurs, all 842 driver-straights on 41 reportable straights. Dashed line: median (0.76).}
   \label{fig:vmax}
 \end{figure}
 
-The size of the loss after the peak does not rise uniformly with peak speed (Figure~\ref{fig:scatter}). The median loss is \emph{higher} below the taper onset than above it: 13.0~km/h for the 106 driver-straights that peak below 290~km/h, against 11.0~km/h for the 736 that peak at or above it. Below the onset the taper does not limit power. Most of these segments include corners taken flat out, where cars lose speed from drag and cornering load whatever the power limit. Above the onset, loss increases with peak speed (Spearman $\rho = 0.36$). This pattern is consistent with the speed-dependent C5.2.8 limit, but it is not evidence that the limit causes it. \textbf{Peak speed is confounded with straight length}: longer straights allow higher peak speeds and also more distance over which to lose speed. Circuit is confounded with both. These are raw, uncentered values.
-
-\begin{figure}[tbp]
+\begin{figure}[!htbp]
   \centering
   \includegraphics[width=\textwidth]{fig_season_peak_vs_clip.pdf}
-  \caption{Speed lost after peak (\var{clip\_delta}) vs peak speed, one point per driver-straight on 41 reportable straights, coloured by PU. The black line is the median per 5~km/h bin, drawn only for bins with at least 10 driver-straights (3 sparser bins with 8 points in total are omitted from the line). Dashed: C5.2.8 taper onset (290~km/h). Straight length and circuit are confounded with peak speed.}
+  \caption{Speed lost after the peak against peak speed, one point per driver-straight, coloured by PU. Black line: median per 5~km/h bin with at least 10 points (3 sparser bins with 8 points in total omitted). Dashed: 290~km/h onset.}
   \label{fig:scatter}
 \end{figure}
 
+\FloatBarrier
 \subsection{PU differences are about as large as teammate differences}
 \label{sec:res-pu}
 
-Once each straight's mean is removed, the spread between PU manufacturers is about the same as the spread between teammates. The PU medians of centered \var{clip\_delta} range from $-0.9$~km/h (Mercedes) to $+1.1$~km/h (Honda), a span of 2.1~km/h; teammates on the same straight differ by a median 2.0~km/h (IQR 1.0--4.0, 408 pairs). Team medians within a PU span up to 3.8~km/h, and the PU medians of centered \var{decel\_rate} range from $-0.49$ to $0.29$~km/h per 100~m (Figure~\ref{fig:pu}).
+Teammates share a car and a power unit, so the gap between them gives a natural yardstick for differences that come from driving and from lap-to-lap variation rather than from the car. Results-level studies use the same logic to separate driver from constructor \citep{bell2016formula, vankesteren2023bayesian}. Once each straight's mean is removed, the spread between PU manufacturers is about the same as the gap between teammates. Figure~\ref{fig:pu} shows the centred values by PU. The PU medians of centred \var{clip\_delta} range from $-0.9$~km/h (Mercedes) to $+1.1$~km/h (Honda), a span of 2.1~km/h, while teammates on the same straight differ by a median 2.0~km/h (IQR 1.0--4.0, 408 pairs). Within a single PU, team medians span up to 3.8~km/h. The PU medians of centred \var{decel\_rate} range from $-0.49$ to $0.29$~km/h per 100~m.
 
-Splitting by regime gives similar results. Here each straight is assigned by its median peak speed, so the counts differ from the per-driver-straight split in Section~\ref{sec:res-peak}. On the 5 straights with median peak below 290~km/h (88 driver-straights), PU medians range from $-0.4$ to $2.9$~km/h. On the 36 straights at or above 290~km/h (754 driver-straights), they range from $-0.9$ to $2.4$~km/h. With one or two cars per team and one lap per driver, these numbers do not rank the PUs.
+Splitting by speed regime gives a similar picture. Here each straight is assigned as a whole by its median peak speed, so the counts differ slightly from the per-driver split in Section~\ref{sec:res-peak}. On the 5 straights with a median peak below 290~km/h (88 driver-straights), PU medians range from $-0.4$ to $2.9$~km/h. On the 36 straights at or above 290~km/h (754 driver-straights), they range from $-0.9$ to $2.4$~km/h. With one or two cars per team and one lap per driver, the sample is too small to rank the manufacturers.
 
-\begin{figure}[tbp]
+\begin{figure}[!htbp]
   \centering
   \includegraphics[width=\textwidth]{fig_season_centered_by_pu.pdf}
-  \caption{Centered \var{clip\_delta} (left) and \var{decel\_rate} (right) per PU across 41 reportable straights in 16 sessions. Dots are driver-straights, the black bar is the median and the black line the IQR; 0 is the straight mean.}
+  \caption{Centred speed lost after the peak (left) and deceleration after the peak (right) by PU. Dots: driver-straights; bar: median; line: IQR; 0: straight mean.}
   \label{fig:pu}
 \end{figure}
+
+% ---------------------------------------------------------------------------
+\section{Comparison with 2025}
+\label{sec:years}
+
+Comparing across years needs straights that exist in both. A straight is \emph{matched} if the same corner label exists at the same circuit in both years, with at least 10 clean drivers in each. This yields 39 matched straights at 15 circuits. A matched straight \emph{shows no clipping} if its median \var{clip\_delta} is zero in both years, and counts as a straight \emph{with clipping} otherwise.
+
+Each straight is compared with itself. For each matched straight and year we take the median over drivers (one lap each). We then take the 2026~$-$~2025 difference per straight, and report the median and IQR of those differences. Pairing in this way holds the circuit, the corner and the length of the straight constant. All 2026 cars are pooled, because Section~\ref{sec:res-pu} found the differences between PUs to be small.
+
+Two checks guard against artefacts. First, a changed braking point or a mislabelled corner would move the end of a segment. We therefore flag any straight whose median segment end point moved more than 50~m between years, using position data. Second, rain lowers grip and speeds, changes lines and tyre choice, and alters where a driver can stay flat out \citep{pirelli2020wet}. From Miami onwards, wet sessions also run with reduced maximum ERS deployment \citep{fia2026refinements}, and the regulations treat wet qualifying differently, for instance by suspending the 107\% rule \citep{fia2026sporting}. A wet session could therefore change the measured loss for reasons unrelated to the year. We repeat the comparison without any circuit at which FastF1 weather data record rainfall at any point in qualifying in either year.
 
 \subsection{Every straight that clips does so earlier and harder in 2026}
 \label{sec:res-years}
 
 On all 33 matched straights with clipping, 2026 cars peak earlier and lose more speed after the peak than 2025 cars did on the same straight. The other 6 matched straights show no clipping in either year.
 
-\paragraph{Speed signature.} Pooled over all matched straights, the 2026 speed profile rises faster and fades before the end of the segment (Figure~\ref{fig:signature}). Taken over all driver-straights, the median peak position is 1.00 in 2025 and 0.77 in 2026. Table~\ref{tab:paired} gives 0.99 for 2025 instead, because it is the median of the per-straight medians. The 2026 median curve lies above the 2025 curve from the segment start to 0.84 of its length, meaning a faster early gain relative to peak speed; the gap is 0.025 of peak speed at the start. The 2026 curve then falls below, ending at 96.4\% of peak speed against 100.0\% in 2025. This is a descriptive comparison and involves no statistical test.
+\paragraph{Speed signature.} Figure~\ref{fig:signature} pools all matched straights into a single speed profile per year. Each driver's segment is stretched to a common length and its speed divided by its own peak, so straights of different lengths and speeds can be laid on top of one another. In 2025, the median curve climbs all the way to the end of the segment: the median peak position over driver-straights is 1.00. In 2026, it rises faster, peaks at a median 0.77 of the way along, and fades before the braking point. Table~\ref{tab:paired} gives 0.99 for 2025 instead, because it is the median of the per-straight medians. The 2026 curve lies above the 2025 curve from the start of the segment to 0.84 of its length, with a gap of 0.025 of peak speed at the start, which indicates a faster early gain relative to peak speed. The curves then cross: the 2026 curve ends at 96.4\% of peak speed, against 100.0\% in 2025.
 
-\begin{figure}[tbp]
+\begin{figure}[!htbp]
   \centering
   \includegraphics[width=\textwidth]{fig_regs_speed_signature.pdf}
-  \caption{Speed signature of the 39 matched straights. Each driver-straight is resampled to normalised distance (0 = segment start, 1 = end), with speed divided by its segment peak. Line = median, band = IQR across driver-straights (762 in 2025, 801 in 2026). Dashed = median peak position over driver-straights (1.00 in 2025, 0.77 in 2026). Right panel: zoom on 0.6--1.0 of the segment (descriptive comparison; no statistical test).}
+  \caption{Speed signature of the 39 matched straights: speed relative to the segment peak against normalised distance. Line: median; band: IQR across driver-straights (762 in 2025, 801 in 2026). Dashed: median peak position. Right: zoom on the last 40\% of the segment.}
   \label{fig:signature}
 \end{figure}
 
-\paragraph{Straight by straight.} The shift holds on each clipped straight individually, not only on the pooled profile (Figure~\ref{fig:dumbbell}, Table~\ref{tab:paired}). Across the 33, the peak moved towards the start by a median 0.20 of the straight (range 0.01 to 0.59). Speed lost after the peak grew by a median 10.5~km/h (range 1.0 to 50.5). The smallest changes count the same as the largest: Monza T4 ($-0.01$, $+2.0$~km/h) and the Baku main straight ($-0.01$, $+1.0$~km/h). Some segments include corners taken flat out, where speed falls even in 2025 because of drag and cornering load; the paired design compares each straight with itself. The year difference reflects the whole 2026 package (PU, aerodynamics and the Straight-Line Mode wings), not any single rule.
+\paragraph{Straight by straight.} The pooled profile could in principle be driven by a few straights. Figure~\ref{fig:dumbbell} shows that it is not: each row is one matched straight, with 2025 and 2026 joined by a line, as recommended for paired data \citep{weissgerber2015}. On every clipped straight, the 2026 point sits to the left in the peak-position panel and to the right in the speed-loss panel. Across the 33, the peak moved towards the start by a median 0.20 of the straight (range 0.01 to 0.59), and speed lost after the peak grew by a median 10.5~km/h (range 1.0 to 50.5). The smallest changes count the same as the largest: Monza T4 ($-0.01$, $+2.0$~km/h) and the Baku main straight ($-0.01$, $+1.0$~km/h). Some segments include corners taken flat out, where speed falls even in 2025 because of drag and cornering load; the pairing compares each such straight with itself. Table~\ref{tab:paired} summarises the paired differences across all 39 straights.
 
-\begin{figure}[tbp]
+\begin{figure}[!htbp]
   \centering
   \includegraphics[width=\textwidth]{fig_regs_dumbbell.pdf}
-  \caption{Each matched straight, 2025 (grey) and 2026 (accent) joined by a line. Each dot is the median across drivers on that straight in that year, one lap per driver, from 13--20 drivers in 2025 and 11--22 in 2026. Straights with clipping (33) are sorted by how far the peak moved; the 6 without clipping in either year are at the bottom, where the dots overlap. Showing paired data individually follows \citet{weissgerber2015}.}
+  \caption{Each matched straight in 2025 (grey) and 2026 (accent). Each dot is the median across drivers, one lap each (13--20 drivers in 2025, 11--22 in 2026). Straights with clipping (33) are sorted by how far the peak moved; the 6 without clipping are at the bottom, where the dots overlap.}
   \label{fig:dumbbell}
 \end{figure}
 
-\begin{table}[tbp]
+\begin{table}[!htbp]
   \centering
-  \caption{Paired difference 2026 $-$ 2025 per straight across 39 matched straights: median of the per-straight medians in each year, median and IQR of the difference across straights, and share of straights where 2026 is higher. ``Peak before end'' and ``loss $\ge$ 2~km/h'' are the shares of drivers on a straight.}
+  \caption{Paired difference 2026 $-$ 2025 across 39 matched straights: median of the per-straight medians in each year, median and IQR of the per-straight difference, and share of straights where 2026 is higher. ``Peak before end'' and ``loss $\ge$ 2~km/h'' are shares of drivers on a straight.}
   \label{tab:paired}
   \small
   \begin{tabular}{lrrrr}
@@ -241,56 +262,51 @@ On all 33 matched straights with clipping, 2026 cars peak earlier and lose more 
 
   \medskip
   \begin{minipage}{0.92\textwidth}
-    \footnotesize\textit{Note.} ``Peak before end'' rises on more straights (87\%) than median \var{clip\_delta} does (85\%). Because speed is reported in integer km/h, a driver on a drag-limited plateau can register a peak before the end with no measurable loss. On straights without clipping, the share of drivers peaking before the end can therefore rise while the median loss stays at zero. At the Montreal main straight, for example, the share rose from 0.05 to 0.36 while the median \var{clip\_delta} was 0 in both years.
+    \footnotesize\textit{Note.} ``Peak before end'' rises on one more straight (87\%) than median \var{clip\_delta} does (85\%). Because speed is reported in whole km/h, a driver at a drag-limited top speed can register a peak before the end with no measurable loss. At the Montreal main straight, for example, the share of drivers peaking before the end rose from 0.05 to 0.36 while the median \var{clip\_delta} was 0 in both years.
   \end{minipage}
 \end{table}
 
-\paragraph{Robustness.} The result does not depend on the two checks in Section~\ref{sec:robust}. Median segment end points moved 0--32~m between years (median 12~m), so no straight crossed the 50~m flag. Rain fell during qualifying at Baku in 2025 and at Montreal and Zandvoort in 2026. Excluding those sessions leaves 31 matched straights: on all 26 with clipping, 2026 cars peak earlier and lose more speed, and the other 5 show no clipping in either year. The median \var{clip\_delta} difference stays at $+7.50$~km/h.
+\paragraph{Robustness.} Neither check changes the result. Median segment end points moved 0--32~m between years (median 12~m), so no straight crossed the 50~m flag. Rain fell during qualifying at Baku in 2025 and at Montreal and Zandvoort in 2026. Excluding those circuits leaves 31 matched straights. On all 26 with clipping, 2026 cars still peak earlier and lose more speed, the other 5 show no clipping in either year, and the median \var{clip\_delta} difference stays at $+7.50$~km/h.
 
-\paragraph{Suzuka.} A single circuit shows the pattern on the track map (Figure~\ref{fig:maps}). On the fastest freeze-free push lap in each year, the maximum speed lost after a segment's peak is 10~km/h in 2025 (VER, lap 16) and 50~km/h in 2026 (PIA, lap 16). Each map shows one lap, so it illustrates the pattern rather than measuring it.
+\paragraph{Suzuka.} Figure~\ref{fig:maps} shows the pattern on a track map, colouring each straight by the speed lost since its peak on the fastest freeze-free push lap of each year. In 2025 (VER, lap 16) the largest loss after a peak is 10~km/h. In 2026 (PIA, lap 16) it is 50~km/h.
 
-\begin{figure}[tbp]
+\begin{figure}[!htbp]
   \centering
   \includegraphics[width=\textwidth]{fig_regs_suzuka_maps.pdf}
-  \caption{Suzuka clipping maps on one colour scale, fastest freeze-free push lap per year (2025 VER lap 16, maximum 10~km/h; 2026 PIA lap 16, maximum 50~km/h). Colour = speed lost since the segment's peak, from the peak to the segment end; grey = outside full-throttle segments or before the peak.}
+  \caption{Suzuka, fastest freeze-free push lap per year, on one colour scale: speed lost since the segment's peak. Grey: outside full-throttle segments or before the peak.}
   \label{fig:maps}
 \end{figure}
 
-\FloatBarrier
 % ---------------------------------------------------------------------------
 \section{Discussion}
 
-Taken together, the three findings describe a behaviour that is widespread, new and common to the field. Most 2026 driver-straights peak before the end of the full-throttle segment, and above the taper onset the speed lost after the peak tends to grow with peak speed. The spread between PU manufacturers is no larger than the spread between teammates, so at this resolution the data do not separate the manufacturers. Against 2025, every matched straight that clips produces an earlier peak and a larger loss. The pattern is therefore better described as a property of the 2026 cars as a group than of any one manufacturer, although one or two cars per team cannot rule out smaller PU differences.
+Taken together, the three findings describe a behaviour that is widespread, new and shared across the field. Most 2026 driver-straights peak before the end of the full-throttle segment. Above the 290~km/h onset, the speed lost after the peak tends to grow with peak speed, although peak speed is confounded with straight length. The spread between PU manufacturers is no larger than the gap between teammates, so at this resolution the data do not separate the manufacturers. Against 2025, every matched straight that clips does so earlier and harder. The pattern is therefore better described as a property of the 2026 cars as a group than of any one manufacturer, although one or two cars per team cannot rule out smaller PU differences.
 
-Compared with \citet{bopaiah2021}, the approach trades depth for breadth. They studied one qualifying session, combined broadcast-derived speed traces with a full-vehicle simulation, and could therefore estimate the energy recovered by the MGU-K. We have no energy model. Instead we measure one observable across a season, with a matched set of 2025 sessions, every exclusion logged, and cleaning rules fixed on one event before the season was run. The approaches are complementary: a single-session model can explain how a car uses its energy, and a season-wide measurement shows how general a pattern is.
+The shape of the 2026 speed profile fits what optimal-control studies predict for an energy-limited hybrid. When the energy per lap is capped, the time-optimal strategy spends it where it saves the most time and accepts less support elsewhere \citep{salazar2017policy, ebbesen2018timeoptimal}. A faster early rise followed by a fade before braking is what one would expect if electrical power is concentrated on acceleration and withdrawn, or reversed into recovery, near the end of the straight, where speed and drag are highest. The descriptive data are consistent with that explanation but cannot confirm it.
 
-The causal question, how much of the loss is due to the C5.2.8 taper and how much to energy limits or to team and driver choices, cannot be answered from public telemetry. It would require the energy store's state of charge, the ERS-K deployment power along the lap, the energy harvested per lap against the C5.2.10 limit, and the use of Override Mode. With those channels, taper-limited and energy-limited speed loss could be separated straight by straight.
+Compared with \citet{bopaiah2021}, this approach trades depth for breadth. They studied one qualifying session in detail. Here a single observable is measured across a season, against a matched set of 2025 sessions, with every exclusion logged and with cleaning rules developed on one event (Suzuka) and then applied unchanged to the rest. The two approaches complement each other: a detailed single-session study can show how a car uses its energy, and a season-wide measurement shows how general a pattern is.
 
-\FloatBarrier
+The causal question, how much of the loss comes from the speed-dependent power limit and how much from energy limits or from team and driver choices, cannot be answered from public telemetry. It would require the energy store's state of charge, the MGU-K's deployment and harvesting power along the lap, the energy recovered per lap against the event's limit, and the use of Overtake. None of these is in the public feed. With those channels, taper-limited, energy-limited and harvest-driven speed loss could be separated straight by straight, and a model adjusting for straight length could replace the descriptive comparisons used here.
+
 % ---------------------------------------------------------------------------
 \section{Limitations}
+\label{sec:limits}
 
 \begin{itemize}
-  \item \textbf{Descriptive only.} We fit no models and run no tests. No difference reported here is an estimated effect.
-  \item \textbf{Confounding.}
-  \begin{itemize}
-    \item Peak speed is confounded with straight length and circuit (Section~\ref{sec:res-peak}).
-    \item The split before and after Miami is confounded with circuit, because no circuit appears in both periods. Pre-Miami data quality was also worse (mean freeze share 7.0\% vs 0.2\%). We therefore do not interpret the pre/post difference: median \var{clip\_delta} was 26.0~km/h on 8 pre-Miami straights and 9.0~km/h on 33 post-Miami straights. We do not analyse the content of the Miami amendments.
-  \end{itemize}
-  \item \textbf{Whole-package comparison.} The 2025 vs 2026 difference reflects every change between the two cars, not the C5.2.8 taper alone.
-  \item \textbf{Unobserved state.} Telemetry has no state of charge, deployment or energy limit, so we cannot attribute a given speed loss to the taper, to the energy limits, or to driver choice.
+  \item \textbf{Descriptive design.} We report counts, medians and ranges, not estimated effects. Interval estimates that resample by circuit, and a model that adjusts for straight length, are natural next steps.
+  \item \textbf{Confounding.} Peak speed is confounded with straight length and circuit (Section~\ref{sec:res-peak}). Energy limits are also set event by event, so part of the variation between circuits may reflect the limit in force rather than the circuit itself \citep{fia2026refinements}.
+  \item \textbf{The Miami split.} No circuit appears in both periods, and pre-Miami data quality was worse (mean freeze share 7.0\% against 0.2\%). Median \var{clip\_delta} was 26.0~km/h on the 8 pre-Miami straights and 9.0~km/h on the 33 post-Miami straights. The direction is consistent with the lower qualifying recharge limit introduced at Miami, but the difference cannot be separated from circuit or data quality, so we do not interpret it.
+  \item \textbf{Whole-package comparison.} The 2025--2026 difference reflects every change between the two cars, including the aerodynamic modes and the lower mass, not the power-unit rules alone.
+  \item \textbf{No ERS channels.} Public telemetry has no state of charge, deployment or harvesting power, so a given speed loss cannot be attributed to the speed-dependent limit, to energy limits, to superclipping, or to driver choice.
   \item \textbf{Sample.} There are one or two cars per team and one lap per driver per straight. Madrid and Sepang have no corner-labelled straights.
-  \item \textbf{Measurement.} Speed is reported in integer km/h. Freezes remove more data in some sessions (up to 10.6\% at Suzuka 2026). The \var{JumpFlag} robustness check (Appendix~\ref{app:cleaning}) was run for Suzuka only, where 1 of 62 selected segments was flagged and excluding it changed mean \var{clip\_delta} per straight by at most 0.4~km/h.
-  \item \textbf{Rules on 2025 data.} The \var{JumpFlag} bound is derived from 2026 values and is not interpreted for 2025.
+  \item \textbf{Measurement.} Speed is reported in whole km/h, and the reported magnitudes depend on the minimum segment length (Appendix~\ref{app:sens}). Freezes remove more data in some sessions (up to 10.6\% at Suzuka 2026). The \var{JumpFlag} check (Appendix~\ref{app:cleaning}) was run for Suzuka only, where 1 of 62 selected segments was flagged and excluding it changed the mean \var{clip\_delta} per straight by at most 0.4~km/h. Its bound is derived from 2026 values and is not interpreted for 2025.
 \end{itemize}
 
-\FloatBarrier
 % ---------------------------------------------------------------------------
 \section{Conclusion}
 
-Public telemetry, cleaned with documented sentinel values only, is sufficient to measure full-throttle speed loss across a Formula One season. In 2026 qualifying, losing speed before the end of a straight is the norm rather than the exception, it is not specific to one manufacturer, and on the same straights it is new relative to 2025. Why it happens is a separate question: separating the C5.2.8 taper from the energy limits requires channels that are not public.
+Public telemetry, cleaned with documented sentinel values only, is enough to measure full-throttle speed loss across a Formula One season. In 2026 qualifying, losing speed before the end of a straight is the norm rather than the exception. It is not specific to one manufacturer, and on the same straights it is new relative to 2025. Explaining why it happens is a separate task: separating the speed-dependent power limit from energy limits and superclipping requires the energy-system channels that teams hold but the public feed does not carry.
 
-\FloatBarrier
 \section*{Data and code availability}
 The pipeline (\texttt{flatout.py}) and notebooks are available at \url{https://github.com/see7ien/Flat-Out}. All numbers in this paper are taken from the notebook outputs.
 
@@ -302,20 +318,60 @@ The pipeline (\texttt{flatout.py}) and notebooks are available at \url{https://g
 \section{Cleaning rules}
 \label{app:cleaning}
 
-We use only documented sentinel values and tune no thresholds:
+Freezes and unknown brake states are identified from documented sentinel values only, with no thresholds tuned to the data. The one rule with a numerical bound, (c), flags segments but removes none:
 \begin{itemize}
-  \item[(a)] A run of unchanged Speed, RPM and gear that contains \var{Throttle}~$=104$ is a freeze, plus a one-sample buffer on each side. FastF1 documents the value 104 for stationary cars \citep{fastf1}; we observe it during running. Segments that overlap a freeze are dropped.
+  \item[(a)] A run of unchanged Speed, RPM and gear that contains \var{Throttle}~$=104$ is a freeze, plus a one-sample buffer on each side. FastF1 documents 104 as an error or unavailable value, usually seen when the car is stationary \citep{fastf1}, and its maintainer notes that it should not occur in lap telemetry \citep{fastf1issue772}. We observe it while cars are running. Segments that overlap a freeze are dropped.
   \item[(b)] OpenF1 \var{brake}~$=104$ means the brake state is unknown. It does not end a full-throttle segment and is trimmed from the segment's end. OpenF1 \var{brake}~$=100$ is taken as genuine braking.
   \item[(c)] A single-step speed increase of at least 5~km/h beyond what 800~kW could produce for a 700~kg car is flagged (\var{JumpFlag}), not removed. Results are reported with and without flagged segments, in the spirit of a multiverse analysis \citep{steegen2016}.
 \end{itemize}
 We also tested a Speed/RPM ratio check \citep[sec.~6.4]{segers2014}. It did not separate stale from updating speed, so it is used only as a diagnostic. Figure~\ref{fig:freezemap} shows where the flagged samples fall on the Suzuka lap in 2026.
 
-\begin{figure}[tbp]
+\begin{figure}[!htbp]
   \centering
   \includegraphics[width=0.48\textwidth]{fig_suzuka_map_b.pdf}
   \caption{Locations of 3,940 flagged car-data samples (including one-sample buffers) on 75 of 108 push laps, Suzuka 2026.}
   \label{fig:freezemap}
 \end{figure}
+
+\FloatBarrier
+\renewcommand{\thetable}{B\arabic{table}}
+\renewcommand{\theHtable}{B\arabic{table}}
+\setcounter{table}{0}
+\section{Sensitivity to the segment definition}
+\label{app:sens}
+
+The segment extraction and clean-lap selection were rerun with the same code for every combination of throttle threshold (95, 98 and 100\%) and minimum segment length (300, 500 and 800~m), on all 2026 sessions and all paired 2025 sessions, with the reporting rules unchanged (at least 10 clean drivers per straight). Table~\ref{tab:sens} gives the headline numbers for each combination; the row in bold is the definition used in the paper.
+
+\begin{table}[!htbp]
+  \centering
+  \caption{Headline numbers under nine segment definitions. Season columns use all reportable 2026 straights; paired columns compare matched straights in 2025 and 2026. ``Earlier, harder / clipped'': straights with clipping on which 2026 cars peak earlier and lose more speed, out of all straights with clipping. ``Median diff.\ loss'': median 2026~$-$~2025 difference in speed lost after the peak.}
+  \label{tab:sens}
+  \footnotesize
+  \setlength{\tabcolsep}{4pt}
+  \begin{tabular}{rrrrrrrr}
+    \toprule
+     & & \multicolumn{3}{c}{2026 season} & \multicolumn{3}{c}{2025 vs 2026, paired} \\
+    \cmidrule(lr){3-5}\cmidrule(lr){6-8}
+    Throttle & Min.\ length & Driver- & Peak before & Median peak & Matched & Earlier, harder & Median diff.\ \\
+    (\%) & (m) & straights & end (\%) & position & straights & / clipped & loss (km/h) \\
+    \midrule
+     95 & 300 & 1320 & 70 & 0.88 & 61 & 45 / 46 & $+4.0$ \\
+     95 & 500 &  845 & 86 & 0.76 & 40 & 34 / 34 & $+8.0$ \\
+     95 & 800 &  395 & 95 & 0.66 & 18 & 18 / 18 & $+19.8$ \\
+     98 & 300 & 1316 & 70 & 0.88 & 60 & 44 / 44 & $+4.0$ \\
+    \textbf{98} & \textbf{500} & \textbf{842} & \textbf{86} & \textbf{0.76} & \textbf{39} & \textbf{33 / 33} & $\mathbf{+7.5}$ \\
+     98 & 800 &  395 & 95 & 0.66 & 18 & 18 / 18 & $+19.5$ \\
+    100 & 300 & 1245 & 69 & 0.88 & 59 & 44 / 44 & $+3.0$ \\
+    100 & 500 &  795 & 85 & 0.77 & 39 & 33 / 33 & $+7.0$ \\
+    100 & 800 &  370 & 94 & 0.66 & 18 & 18 / 18 & $+20.0$ \\
+    \bottomrule
+  \end{tabular}
+
+  \medskip
+  \begin{minipage}{0.92\textwidth}
+    \footnotesize\textit{Note.} The one straight with clipping that does not peak earlier and lose more speed in 2026 (95\%, 300~m) is Silverstone T16: median peak position 0.97 in 2025 and 1.00 in 2026, median \var{clip\_delta} 0.5 and 0.0~km/h.
+  \end{minipage}
+\end{table}
 
 \FloatBarrier
 \bibliographystyle{plainnat}
