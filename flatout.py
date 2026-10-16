@@ -22,8 +22,9 @@ CACHE = ROOT / "cache"
 fastf1.set_log_level("WARNING")
 warnings.filterwarnings("ignore", message="The 'generic' unit for NumPy timedelta")  # raised inside pandas/FastF1 timedelta ops
 pd.set_option("display.width", 250)
-plt.rcParams.update({"font.family": "serif", "mathtext.fontset": "cm", "axes.spines.top": False,
-                    "axes.spines.right": False, "savefig.bbox": "tight"})
+plt.rcParams.update({"font.family": "serif", "mathtext.fontset": "cm", "font.size": 8, "axes.labelsize": 8.5,
+                    "axes.spines.top": False, "axes.spines.right": False, "savefig.bbox": "tight"})
+FULL_W, HALF_W = 6.3, 3.1  # printed figure widths (in): report text width (A4, 25 mm margins) and half of it
 
 
 # ---------------------------------------------------------------- constants
