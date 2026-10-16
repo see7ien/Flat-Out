@@ -1,36 +1,46 @@
-# F1 2026 Clipping Analysis
+# Flat Out: clipping in 2026 F1 qualifying
 
-A reproducible, season-wide measurement of full-throttle speed loss ("clipping") in 2026 F1 qualifying from FastF1 telemetry, compared across power unit manufacturers.
+The 2026 cars get far more of their power from the battery, and the rules cut that electrical power as speed rises above 290 km/h. One result is "clipping": a car stops accelerating, or even slows, before the end of a straight while the driver still has the throttle fully open. I wanted to see how often that actually happens, so this project measures it in every 2026 qualifying session up to Singapore, using only public telemetry, and compares the same straights with 2025.
 
-## Repository
-| Path | Contents |
+The short version: most 2026 cars peak before the end of the straight, the differences between engine manufacturers are about the size of the gap between teammates, and on all 33 matched straights where clipping shows up, the 2026 cars peak earlier and lose more speed than the 2025 cars did. The full write-up is in [`report/final report.pdf`](report/final%20report.pdf).
+
+## What's in here
+
+| Path | What it is |
 |---|---|
-| `flatout.py` | Pipeline module: constants (with citations), telemetry freeze flags, OpenF1 brake input, push-lap selection, sector PKE, full-throttle segments and clipping metrics, `run_session()`, `openf1_session_key()`, `caption()` |
-| `01_japan_validation.ipynb` | 2026 Japanese GP: validation, freeze evidence, results, robustness check, appendices |
-| `02_season.ipynb` | Season run: every 2026 main Qualifying session through `run_session()`, with a QC summary and descriptive results |
-| `03_regulations.ipynb` | 2025 vs 2026 qualifying at the same circuits, paired by straight (run `02_season.ipynb` first) |
-| `04_sensitivity.ipynb` | Headline numbers under 9 segment definitions (throttle 95/98/100 %, minimum length 300/500/800 m); cached in `data/sensitivity/` |
-| `figures/` | Figures exported as PDF |
-| `NOTES.md` | Decisions, deviations from spec, open issues |
-| `requirements.txt` | Python dependencies |
+| `report/final report.pdf` | The paper |
+| `report/main.tex`, `report/refs.bib`, `report/figures/` | LaTeX source for the paper |
+| `flatout.py` | The pipeline: loading sessions, flagging frozen telemetry, picking push laps, finding full-throttle segments and measuring the speed loss |
+| `01_japan_validation.ipynb` | Suzuka 2026, where the method was built and checked |
+| `02_season.ipynb` | Every 2026 qualifying session run through the same pipeline |
+| `03_regulations.ipynb` | 2025 against 2026 at the same circuits, straight by straight (needs `02` first) |
+| `04_sensitivity.ipynb` | Reruns the headline numbers with different throttle thresholds and minimum straight lengths |
+| `figures/` | Every figure, as PDF |
+| `NOTES.md` | Running notes on decisions and open questions |
 
-Not tracked (see `.gitignore`): `cache/` (FastF1 and OpenF1 downloads), `data/` (output CSVs), `refs/` (reference PDFs).
+A few folders aren't tracked because they're large or easy to regenerate: `cache/` (FastF1 and OpenF1 downloads), `data/` (the CSV outputs) and `refs/` (reference PDFs).
 
-## How to run
+## Running it
+
+Set up a virtual environment and install the dependencies:
+
 ```bash
 python -m venv venv
 ```
+
 ```bash
 venv/Scripts/pip install -r requirements.txt
 ```
-Then open the notebooks from the repository root:
-- `01_japan_validation.ipynb` writes `data/japan_sectors.csv`, `data/japan_segments.csv` and the figures.
-- `02_season.ipynb` writes one set of CSVs per session to `data/season/`, plus `data/season/qc_summary.csv`.
 
-The first run downloads FastF1 sessions and OpenF1 `car_data` (about 16,000 rows per driver per session) into `cache/`; later runs read from the cache.
+Then run the notebooks in order from the repository root. The first run downloads every session from FastF1 and OpenF1 into `cache/`, so it takes a while; after that everything reads from the cache. `02_season.ipynb` writes its results to `data/season/`, and the later notebooks read from there.
 
-One session from Python:
+If you only want one session, you can call the pipeline directly:
+
 ```python
 from flatout import openf1_session_key, run_session
 tables, qc = run_session(2026, "Japan", official_length_m=5807, openf1_session=openf1_session_key(2026, "Japan"))
 ```
+
+## Data
+
+Telemetry comes from [FastF1](https://docs.fastf1.dev) (version 3.8.3), with brake data cross-checked against [OpenF1](https://openf1.org). Neither feed includes battery or energy data, so the analysis can show where and how much speed is lost, but not which rule or strategy causes it.
