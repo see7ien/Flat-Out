@@ -122,7 +122,7 @@ These changes act directly on the quantity measured here. Less energy to recover
 
 Telemetry comes from FastF1 version~3.8.3 \citep{fastf1}, an open-source Python package that serves the official Formula One live-timing feed: car data (Speed, RPM, gear, Throttle, Brake) and position data (X/Y). FastF1 has been used in the same way in recent peer-reviewed work \citep{cappello2026tire}. Brake values are cross-checked against the \var{car\_data} endpoint of OpenF1 \citep{openf1}, which was available for every session used.
 
-The 2026 calendar was announced with 24 rounds. The Bahrain and Saudi Arabian Grands Prix, scheduled for April, were cancelled in March because of the conflict in the Middle East, which left 22 rounds \citep{sky2026cancel}. The Bahrain Grand Prix was later restaged at the Sepang circuit in Malaysia in October, so the season now has 23 rounds \citep{f12026malaysia}. Seventeen qualifying sessions had been held by the Singapore Grand Prix (10 October 2026), and all are included. FastF1 has no corner positions yet for the new Madrid circuit or for Sepang, which last hosted Formula One in 2017 \citep{fastf1issue692}, so straights there cannot be labelled by the corner they end at. Sepang therefore contributes only its main straight, and Madrid no reportable straight. For 2025, we use the 15 qualifying sessions held at circuits that were also raced in 2026, matched by OpenF1 \var{circuit\_key}.
+The 2026 calendar was announced with 24 rounds. The Bahrain and Saudi Arabian Grands Prix, scheduled for April, were cancelled in March because of the conflict in the Middle East, which left 22 rounds \citep{sky2026cancel}. The Bahrain Grand Prix was later restaged at the Sepang circuit in Malaysia in October, so the season now has 23 rounds \citep{f12026malaysia}. Seventeen qualifying sessions had been held by the Singapore Grand Prix (10 October 2026), and all are included. FastF1's circuit information returned no corner positions for the new Madrid circuit or for Sepang, which last hosted Formula One in 2017, so straights there cannot be labelled by the corner they end at. Sepang therefore contributes only its main straight, and Madrid no reportable straight. For 2025, we use the 15 qualifying sessions held at circuits that were also raced in 2026, matched by OpenF1 \var{circuit\_key}.
 
 \subsection{Validation of distance}
 
@@ -178,7 +178,7 @@ The results in this section use all 842 driver-straights. The first subsection u
 \subsection{Most 2026 cars peak before the end of the straight}
 \label{sec:res-peak}
 
-In 2026 qualifying, most cars reach their peak speed before the end of the full-throttle segment and then lose speed while still at full throttle. Figure~\ref{fig:vmax} shows where the peak falls. If cars accelerated all the way to the braking point, the histogram would be a single bar at 1. Instead, 86\% of the 842 driver-straights peak before the segment end, and the median peak position is 0.76, about three-quarters of the way along the straight. This matches descriptions of 2026 cars peaking earlier on a straight than earlier cars \citep{therace2026fix}, but the 2026 data alone cannot test that comparison; Section~\ref{sec:years} makes it with 2025 data.
+In 2026 qualifying, most cars reach their peak speed before the end of the full-throttle segment and then lose speed while still at full throttle. Figure~\ref{fig:vmax} shows where the peak falls. If cars accelerated all the way to the braking point, the histogram would be a single bar at 1. Instead, 86\% of the 842 driver-straights peak before the segment end, and the median peak position is 0.76, about three-quarters of the way along the straight. This matches descriptions of 2026 cars peaking earlier on a straight than earlier cars \citep{therace2026fix}, but the 2026 data alone cannot test that comparison; Section~\ref{sec:res-years} makes it with 2025 data.
 
 How much speed is lost after the peak depends on how fast the car is going, but not in a simple way (Figure~\ref{fig:scatter}). Each point is one driver-straight, and the black line follows the median in 5~km/h bins of peak speed. The median loss is \emph{higher} below the 290~km/h onset than above it: 13.0~km/h for the 106 driver-straights that peak below it, against 11.0~km/h for the 736 that peak at or above it. Below the onset, the speed-dependent limit does not restrict power. Four of the five straights whose median peak is below the onset contain at least one corner taken flat out (Shanghai T8, Monaco T10, Spa-Francorchamps T12 and Baku T15), where cars lose speed through drag and cornering load whatever the power available; the fifth, the Montreal main straight, contains none. Above the onset, the loss rises with peak speed (Spearman $\rho = 0.36$; \citealp{spearman1904}). This is consistent with the speed-dependent limit, but it does not show that the limit causes the loss. Peak speed is confounded with straight length: longer straights allow higher peak speeds and also leave more distance over which to lose speed. Circuit is confounded with both.
 
@@ -189,14 +189,13 @@ How much speed is lost after the peak depends on how fast the car is going, but 
   \label{fig:vmax}
 \end{figure}
 
-\begin{figure}[!htbp]
+\begin{figure}[!tbp]
   \centering
-  \includegraphics[width=\textwidth]{fig_season_peak_vs_clip.pdf}
+  \includegraphics[width=0.85\textwidth]{fig_season_peak_vs_clip.pdf}
   \caption{Speed lost after the peak against peak speed, one point per driver-straight, coloured by PU. Black line: median per 5~km/h bin with at least 10 points (3 sparser bins with 8 points in total omitted). Dashed: 290~km/h onset.}
   \label{fig:scatter}
 \end{figure}
 
-\FloatBarrier
 \subsection{PU differences are about as large as teammate differences}
 \label{sec:res-pu}
 
@@ -214,6 +213,9 @@ Splitting by speed regime gives a similar picture. Here each straight is assigne
 % ---------------------------------------------------------------------------
 \section{Comparison with 2025}
 \label{sec:years}
+
+\subsection{Design}
+\label{sec:design}
 
 Comparing across years needs straights that exist in both. A straight is \emph{matched} if the same corner label exists at the same circuit in both years, with at least 10 clean drivers in each. This yields 39 matched straights at 15 circuits. A matched straight \emph{shows no clipping} if its median \var{clip\_delta} is zero in both years, and counts as a straight \emph{with clipping} otherwise.
 
@@ -266,13 +268,13 @@ On all 33 matched straights with clipping, 2026 cars peak earlier and lose more 
   \end{minipage}
 \end{table}
 
-\paragraph{Robustness.} Neither check changes the result. Median segment end points moved 0--32~m between years (median 12~m), so no straight crossed the 50~m flag. Rain fell during qualifying at Baku in 2025 and at Montreal and Zandvoort in 2026. Excluding those circuits leaves 31 matched straights. On all 26 with clipping, 2026 cars still peak earlier and lose more speed, the other 5 show no clipping in either year, and the median \var{clip\_delta} difference stays at $+7.50$~km/h.
+\paragraph{Robustness.} Neither of the two checks in Section~\ref{sec:design} changes the result. Median segment end points moved 0--32~m between years (median 12~m), so no straight crossed the 50~m flag. Rain fell during qualifying at Baku in 2025 and at Montreal and Zandvoort in 2026. Excluding those circuits leaves 31 matched straights. On all 26 with clipping, 2026 cars still peak earlier and lose more speed, the other 5 show no clipping in either year, and the median \var{clip\_delta} difference stays at $+7.50$~km/h.
 
 \paragraph{Suzuka.} Figure~\ref{fig:maps} shows the pattern on a track map, colouring each straight by the speed lost since its peak on the fastest freeze-free push lap of each year. In 2025 (VER, lap 16) the largest loss after a peak is 10~km/h. In 2026 (PIA, lap 16) it is 50~km/h.
 
-\begin{figure}[!htbp]
+\begin{figure}[!tbp]
   \centering
-  \includegraphics[width=\textwidth]{fig_regs_suzuka_maps.pdf}
+  \includegraphics[width=0.9\textwidth]{fig_regs_suzuka_maps.pdf}
   \caption{Suzuka, fastest freeze-free push lap per year, on one colour scale: speed lost since the segment's peak. Grey: outside full-throttle segments or before the peak.}
   \label{fig:maps}
 \end{figure}
@@ -308,7 +310,11 @@ The causal question, how much of the loss comes from the speed-dependent power l
 Public telemetry, cleaned with documented sentinel values only, is enough to measure full-throttle speed loss across a Formula One season. In 2026 qualifying, losing speed before the end of a straight is the norm rather than the exception. It is not specific to one manufacturer, and on the same straights it is new relative to 2025. Explaining why it happens is a separate task: separating the speed-dependent power limit from energy limits and superclipping requires the energy-system channels that teams hold but the public feed does not carry.
 
 \section*{Data and code availability}
-The pipeline (\texttt{flatout.py}) and notebooks are available at \url{https://github.com/see7ien/Flat-Out}. All numbers in this paper are taken from the notebook outputs.
+The pipeline (\texttt{flatout.py}) and notebooks are available at
+\begin{center}
+  \url{https://github.com/see7ien/Flat-Out}
+\end{center}
+All numbers in this paper are taken from the notebook outputs.
 
 % ---------------------------------------------------------------------------
 \appendix
